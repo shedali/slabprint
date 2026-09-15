@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Franz Sittampalam
 """Protocol and transports for the nemonic (MangoSlab) MIP-001 sticky-note printer.
 
 The printer is a standard USB printer-class device that also exposes a BLE GATT

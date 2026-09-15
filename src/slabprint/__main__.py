@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Franz Sittampalam
 """`python -m slabprint`.
 
 Goes through run(), not main(), so that this entry point reports failures the

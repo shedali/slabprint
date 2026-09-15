@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Franz Sittampalam
 """nemonic — print to a MangoSlab nemonic MIP-001 sticky-note printer.
 
   slabprint print "Buy milk"                  print a line of text

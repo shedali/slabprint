@@ -8,6 +8,10 @@ desktop bridge is Windows-only. The printer itself is an ordinary USB printer-cl
 device speaking ESC/POS, so none of that is necessary. The protocol is documented in
 [PROTOCOL.md](PROTOCOL.md).
 
+> **Independent project.** Not affiliated with, endorsed by, or supported by
+> MangoSlab Co., Ltd. *MangoSlab* and *nemonic* are their trademarks, used here only
+> to identify the hardware this software talks to. See [NOTICE](NOTICE).
+
 Tested against a MIP-001 on macOS. The command set is shared across the MIP-101,
 MIP-201 and MIP-301, so those should work; only the MIP-001 has been verified.
 
@@ -189,13 +193,26 @@ data; see PROTOCOL.md.
 
 ## Licence
 
-MIT.
+MIT — see [LICENSE](LICENSE). Contributions are accepted on the same terms; see
+[CONTRIBUTING.md](CONTRIBUTING.md).
 
-## Not affiliated with MangoSlab
+Security reporting and an honest statement of what the print service is and is not
+hardened against: [SECURITY.md](SECURITY.md).
 
-This is an independent, unofficial project. It is not affiliated with, endorsed by, or
-supported by MangoSlab. *nemonic* and *MangoSlab* are the trademarks of their owner and
-are used here only to say which printer this software talks to.
+## Trademarks and affiliation
 
-The protocol was determined by observing the vendor's own published application in order
-to interoperate with hardware the author owns. No vendor code is reproduced here.
+This is an independent, unofficial project. It is not affiliated with, endorsed by,
+sponsored by, or supported by MangoSlab Co., Ltd. *MangoSlab* and *nemonic* are
+trademarks of MangoSlab Co., Ltd., used here only to identify the hardware this
+software communicates with — there is no way to say which printer a driver drives
+without naming the printer. The project is deliberately not named after either mark.
+
+The command set in [PROTOCOL.md](PROTOCOL.md) was determined by examining the
+vendor's own publicly distributed Windows application, in order to interoperate with
+hardware the author owns and which the vendor supplies no software to drive on this
+platform. **This repository contains no vendor code, binaries, assets or
+documentation** — only facts about a wire protocol and the author's own prose.
+
+This software drives physical hardware and comes with no warranty of any kind. Using
+third-party software with a device may affect its manufacturer's warranty. See
+[NOTICE](NOTICE).

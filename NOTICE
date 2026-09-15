@@ -1,0 +1,40 @@
+slabprint
+Copyright (c) 2026 Franz Sittampalam
+
+Licensed under the MIT Licence. See LICENSE for the full text.
+
+--------------------------------------------------------------------------------
+Trademarks and affiliation
+--------------------------------------------------------------------------------
+
+This is an independent, unofficial project. It is not affiliated with, endorsed
+by, sponsored by, or supported by MangoSlab Co., Ltd.
+
+"MangoSlab" and "nemonic" are trademarks of MangoSlab Co., Ltd. They are used in
+this project only to identify the hardware that this software communicates with.
+That is nominative use: there is no way to say which printer a driver drives
+without naming the printer. No claim to those marks is made or implied, and the
+project is deliberately not named after either of them.
+
+--------------------------------------------------------------------------------
+Interoperability
+--------------------------------------------------------------------------------
+
+The printer's command set is documented in PROTOCOL.md. It was determined by
+examining the vendor's own publicly distributed Windows application, for the sole
+purpose of interoperating with hardware the author owns and which the vendor
+supplies no software to drive on the author's platform.
+
+This repository contains no code, binaries, assets or documentation belonging to
+MangoSlab Co., Ltd. What PROTOCOL.md records are facts about a wire protocol —
+byte values, identifiers and message layouts — together with the author's own
+prose. Facts of that kind are the substance of any independent implementation.
+
+--------------------------------------------------------------------------------
+No warranty
+--------------------------------------------------------------------------------
+
+This software drives physical hardware. It is provided without warranty of any
+kind, as set out in LICENSE. Using it may consume consumables, and using any
+third-party software with a device may affect the manufacturer's warranty. You
+use it at your own risk.

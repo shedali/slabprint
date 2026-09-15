@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Franz Sittampalam
 """Bitmap packing and text layout."""
 
 import pytest

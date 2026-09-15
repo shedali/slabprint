@@ -1,7 +1,12 @@
 # nemonic MIP-001 printer protocol
 
 Everything needed to drive a MangoSlab **nemonic** sticky-note printer without the
-vendor's software. MangoSlab publishes no protocol documentation and ships no macOS
+vendor's software.
+
+> Independent documentation, not affiliated with or endorsed by MangoSlab Co., Ltd.
+> It records facts about a wire protocol — byte values, identifiers and layouts —
+> established in order to interoperate with hardware the author owns. It reproduces
+> no vendor code, assets or documentation. See [NOTICE](NOTICE). MangoSlab publishes no protocol documentation and ships no macOS
 driver, so this was recovered from their own Windows application.
 
 ## Summary

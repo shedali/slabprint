@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Franz Sittampalam
 """An HTTP print service, so anything on the local network can print.
 
 Deliberately minimal: standard library only, one endpoint, optional shared token.

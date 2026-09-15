@@ -9,6 +9,7 @@ description = "Print to a MangoSlab nemonic sticky-note printer, with no vendor 
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
+license-files = ["LICENSE", "NOTICE"]
 authors = [{ name = "Franz Sittampalam" }]
 keywords = ["thermal-printer", "escpos", "sticky-notes", "nemonic", "mangoslab"]
 classifiers = [

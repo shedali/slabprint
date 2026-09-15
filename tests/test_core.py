@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Franz Sittampalam
 """Protocol encoding. These are the bytes that go down the wire, so they are
 asserted literally rather than via the helpers that produce them."""
 

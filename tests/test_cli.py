@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Franz Sittampalam
 """Argument parsing. The commands themselves need a printer; the parser does not."""
 
 import pytest

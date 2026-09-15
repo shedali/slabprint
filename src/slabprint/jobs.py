@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Franz Sittampalam
 """A tiny file-backed queue of prints scheduled for the future.
 
 Each job is one JSON file named "<epoch>-<id>.json", so the directory sorts by

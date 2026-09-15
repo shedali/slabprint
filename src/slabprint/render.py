@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: MIT
+# Copyright (c) 2026 Franz Sittampalam
 """Turn text and images into 1-bit bitmaps the printer understands."""
 
 from __future__ import annotations
