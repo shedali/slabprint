@@ -1,5 +1,6 @@
 """The HTTP print service."""
 
+import socket
 import threading
 import urllib.error
 import urllib.request
@@ -22,6 +23,7 @@ def start(printed, token=None, fail=False):
         printed.append(lines)
         return f"printed {len(lines)} line(s)"
 
+    # Same class serve() uses, so these tests exercise the real configuration.
     httpd = ThreadingHTTPServer(("127.0.0.1", 0), server.make_handler(print_lines, token))
     threading.Thread(target=httpd.serve_forever, daemon=True).start()
     return httpd, f"http://127.0.0.1:{httpd.server_address[1]}"
@@ -113,4 +115,56 @@ def test_a_printer_failure_becomes_a_500_not_a_hang(printed):
         assert caught.value.code == 500
         assert b"printer on fire" in caught.value.read()
     finally:
+        httpd.shutdown()
+
+
+def raw_post(url, headers, body=b""):
+    """Send a request by hand, so invalid headers can be tested."""
+    host, port = url.removeprefix("http://").split(":")
+    with socket.create_connection((host, int(port)), timeout=10) as connection:
+        request = "POST /print HTTP/1.1\r\nHost: x\r\n" + headers + "\r\n\r\n"
+        connection.sendall(request.encode() + body)
+        return connection.recv(4096).decode("latin-1", "replace")
+
+
+def test_a_negative_content_length_is_refused(printed):
+    """read(-1) would read to EOF, sailing straight past the size limit."""
+    httpd, url = start(printed)
+    try:
+        response = raw_post(url, "Content-Length: -1\r\n", b"x" * 5000)
+        assert "413" in response.splitlines()[0]
+        assert printed == []
+    finally:
+        httpd.shutdown()
+
+
+def test_a_nonsense_content_length_is_refused_not_a_traceback(printed):
+    httpd, url = start(printed)
+    try:
+        response = raw_post(url, "Content-Length: banana\r\n")
+        assert "413" in response.splitlines()[0]
+        assert printed == []
+    finally:
+        httpd.shutdown()
+
+
+def test_an_oversized_body_is_refused(printed):
+    httpd, url = start(printed)
+    try:
+        response = raw_post(url, f"Content-Length: {server.MAX_BODY_BYTES + 1}\r\n")
+        assert "413" in response.splitlines()[0]
+        assert printed == []
+    finally:
+        httpd.shutdown()
+
+
+def test_an_idle_connection_does_not_block_other_clients(printed):
+    """One silent socket used to hold the single-threaded server hostage."""
+    httpd, url = start(printed)
+    idle = socket.create_connection(("127.0.0.1", httpd.server_address[1]), timeout=10)
+    try:
+        assert post(url, "hello").status == 200
+        assert printed == [["hello"]]
+    finally:
+        idle.close()
         httpd.shutdown()

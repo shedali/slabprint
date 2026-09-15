@@ -1,5 +1,6 @@
 """Bitmap packing and text layout."""
 
+import pytest
 from PIL import Image
 
 from nemonic import core, render
@@ -87,7 +88,8 @@ def test_render_text_grows_with_more_lines():
 
 
 def test_render_text_never_exceeds_the_maximum_height():
-    image = render.render_text(["line"] * 400, size=40)
+    with pytest.warns(UserWarning):  # cropping is expected here, and warned about
+        image = render.render_text(["line"] * 400, size=40)
     assert image.height <= render.MAX_HEIGHT_PX
 
 
@@ -126,3 +128,19 @@ def test_load_image_flattens_transparency_instead_of_blackening_it(tmp_path):
     loaded = render.load_image(str(source))
     # A fully transparent image should come out white, not solid black.
     assert loaded.getpixel((0, 0)) == WHITE
+
+
+@pytest.mark.parametrize("size", [0, -1, render.MAX_FONT_SIZE + 1, 40_000])
+def test_an_impossible_font_size_is_refused(size):
+    with pytest.raises(ValueError):
+        render.render_text(["hello"], size=size)
+
+
+def test_cropping_long_content_warns_rather_than_losing_it_silently():
+    with pytest.warns(UserWarning, match="cropped"):
+        render.render_text(["line"] * 400, size=40)
+
+
+def test_content_that_fits_does_not_warn(recwarn):
+    render.render_text(["one line"], size=30)
+    assert not [w for w in recwarn if "cropped" in str(w.message)]

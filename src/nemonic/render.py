@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import textwrap
+import warnings
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -18,6 +19,16 @@ BOLD_FONTS = [
 # Roughly how wide an average glyph is relative to the font size. Used only to
 # choose wrap points; the exact value just trades ragged edges against overflow.
 GLYPH_RATIO = 0.55
+
+# Nothing sensible is taller than the paper is wide. Beyond this, Pillow starts
+# rasterising enormous glyphs and trips its own decompression-bomb guard, which
+# is a confusing way to learn you typed an extra zero.
+MAX_FONT_SIZE = 200
+
+
+def check_size(size: int) -> None:
+    if not 1 <= size <= MAX_FONT_SIZE:
+        raise ValueError(f"size must be between 1 and {MAX_FONT_SIZE}, got {size}")
 
 
 def load_font(size: int):
@@ -35,6 +46,7 @@ def wrap(text: str, size: int, usable_px: int) -> list[str]:
     Continuation lines get a hanging indent so wrapped items stay readable in a
     bulleted list.
     """
+    check_size(size)
     if not text.strip():
         return [""]
     indent = len(text) - len(text.lstrip())
@@ -42,6 +54,16 @@ def wrap(text: str, size: int, usable_px: int) -> list[str]:
     chunks = textwrap.wrap(text.strip(), width=columns) or [""]
     prefix = " " * indent
     return [prefix + chunks[0]] + [prefix + "  " + c for c in chunks[1:]]
+
+
+def _warn_if_cropped(wanted: int, max_height: int) -> None:
+    """Losing the end of a long document silently is worse than a noisy warning."""
+    if wanted > max_height:
+        warnings.warn(
+            f"content is {wanted}px tall but the printer stops at {max_height}px; "
+            "the end has been cropped. Use --columns or a smaller --size.",
+            stacklevel=3,
+        )
 
 
 def _flatten(lines, size: int, usable_px: int) -> list[tuple]:
@@ -104,6 +126,7 @@ def render_text(
     With columns > 1 the content is split across that many columns, balanced by
     drawn height, which suits long checklists and uses far less paper.
     """
+    check_size(size)
     columns = max(1, columns)
     column_width = (width - 2 * margin - gutter * (columns - 1)) // columns
     units = _flatten(lines, size, column_width)
@@ -111,6 +134,7 @@ def render_text(
     if columns == 1:
         canvas = Image.new("1", (width, max_height), 1)
         height = _draw(ImageDraw.Draw(canvas), units, margin, margin, column_width, leading)
+        _warn_if_cropped(height + margin, max_height)
         return canvas.crop((0, 0, width, min(max(height + margin, 40), max_height)))
 
     # Balance by cumulative drawn height rather than unit count, so a heading or
@@ -138,6 +162,7 @@ def render_text(
         x = margin + index * (column_width + gutter)
         bottom = max(bottom, _draw(draw, chunk, x, margin, column_width, leading))
 
+    _warn_if_cropped(bottom + margin, max_height)
     return canvas.crop((0, 0, width, min(max(bottom + margin, 40), max_height)))
 
 

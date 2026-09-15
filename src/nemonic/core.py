@@ -38,7 +38,10 @@ EXECUTE_CUT = bytes([0x1B, 0x69])
 SELF_TEST = bytes([0x1C, 0x7A, 0x53, 0x50])
 STATUS_QUERY = bytes([0x10, 0x04, 0x01])
 
-# Status bits, after masking the response byte with ~0x12.
+# Bits the printer sets in every status reply; they mean nothing on their own.
+ALWAYS_SET_BITS = 0x12
+
+# Status bits, after clearing ALWAYS_SET_BITS.
 STATUS_BITS = {0x04: "cover open", 0x08: "overheated", 0x20: "out of paper", 0x40: "cutter jammed"}
 
 
@@ -52,7 +55,14 @@ def set_copies(n: int) -> bytes:
 
 
 def raster_command(width_bytes: int, height: int) -> bytes:
-    """GS v 0 — raster bit image header. The MIP-001 magic number is 0."""
+    """GS v 0 — raster bit image header. The MIP-001 magic number is 0.
+
+    Both dimensions are 16 bit on the wire. Silently truncating would produce a
+    job the printer accepts and renders as garbage, so refuse instead.
+    """
+    for name, value in (("width_bytes", width_bytes), ("height", height)):
+        if not 0 <= value <= 0xFFFF:
+            raise ValueError(f"{name} must fit in 16 bits, got {value}")
     return bytes(
         [
             0x1D,
@@ -68,8 +78,14 @@ def raster_command(width_bytes: int, height: int) -> bytes:
 
 
 def decode_status(byte_: int) -> list[str]:
-    """Decode a status response into human-readable faults. Empty means ready."""
-    masked = byte_ & ~0x12
+    """Decode a status response into human-readable faults. Empty means ready.
+
+    Bits 0x02 and 0x10 are set in every reply and carry no fault meaning, so they
+    are cleared first. None of the bits in STATUS_BITS overlaps them, so today
+    this changes no result; it is kept so that adding a bit later cannot quietly
+    start reporting a fault on every healthy printer.
+    """
+    masked = byte_ & ~ALWAYS_SET_BITS
     return [name for bit, name in STATUS_BITS.items() if masked & bit]
 
 
@@ -176,7 +192,12 @@ def usb_send(job: bytes, chunk: int = 4096) -> str:
 
 
 def usb_status() -> list[str] | None:
-    """Query printer faults over USB. None if unreachable, [] if ready."""
+    """Query printer faults over USB. None if unreachable, [] if ready.
+
+    A printer that enumerates but will not answer is NOT ready — that is exactly
+    the wedged state a power cycle fixes — so a failed exchange reports
+    unreachable rather than a clean bill of health.
+    """
     opened = usb_open()
     if opened is None:
         return None
@@ -184,9 +205,9 @@ def usb_status() -> list[str] | None:
     try:
         ep_out.write(STATUS_QUERY, timeout=4000)
         reply = bytes(ep_in.read(64, timeout=2500))
-        return decode_status(reply[0]) if reply else []
     except Exception:
-        return []
+        return None
+    return decode_status(reply[0]) if reply else None
 
 
 # --------------------------------------------------------------------------
@@ -200,6 +221,10 @@ async def _ble_send(job: bytes, address: str | None, chunk: int, settle: float) 
     device = None
     if address:
         device = await BleakScanner.find_device_by_address(address, timeout=15.0)
+        if device is None:
+            # An explicit address is a request for THAT printer. Falling back to
+            # whatever else advertises the service could print on a stranger's.
+            raise PrinterError(f"no printer found at {address}")
     if device is None:
         for _, (candidate, advert) in (
             await BleakScanner.discover(timeout=15.0, return_adv=True)

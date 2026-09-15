@@ -70,3 +70,14 @@ def test_build_job_can_skip_the_cut():
 def test_send_rejects_an_unknown_transport():
     with pytest.raises(KeyError):
         core.send(b"", transport="carrier-pigeon")
+
+
+@pytest.mark.parametrize("width_bytes, height", [(-1, 10), (10, -1), (0x10000, 10), (10, 0x10000)])
+def test_raster_command_refuses_values_that_would_silently_truncate(width_bytes, height):
+    with pytest.raises(ValueError):
+        core.raster_command(width_bytes, height)
+
+
+def test_raster_command_accepts_the_edges_of_the_16_bit_range():
+    assert core.raster_command(0, 0)[4:] == bytes([0, 0, 0, 0])
+    assert core.raster_command(0xFFFF, 0xFFFF)[4:] == bytes([0xFF, 0xFF, 0xFF, 0xFF])

@@ -140,22 +140,25 @@ process past even `SIGALRM`, so always probe with `O_NONBLOCK`.
 **macOS no longer supports CUPS raw queues**, so `lpadmin -m raw` cannot be used to make
 a print queue. Talk to the USB endpoint directly instead.
 
-## How this was recovered
+## How this was determined
 
-Reproducible, and needs no hardware:
+Recorded so the findings can be checked, not as an invitation to repeat it. The vendor's
+Windows desktop application was examined in order to interoperate with hardware the
+author owns. No vendor code is reproduced in this repository.
 
-1. Fetch `https://prod.mangoslab.org/oxygen-desktop-production/nemonic-connect.appinstaller`
-   and read the MSIX bundle URL out of it.
-2. Download that bundle (~88 MB), `unzip` it, then `unzip` the `.msix` inside. It is a
-   .NET MAUI application; the logic lives in `Mango.dll`.
-3. `ilspycmd -l c Mango.dll` lists the types; `ilspycmd -t Mango.Nemonic.<Type>` decompiles
-   one. `Mango.xml` ships alongside with the full documented API surface. The interesting
-   types are `SharedCommands`, `Mip001CommandProtocol`, `BleProfileRegistry` and
-   `Mip001HardwareSpec`.
+1. The vendor's published installer manifest names an MSIX bundle.
+2. That bundle unpacks (it is an ordinary zip, twice over) to a .NET MAUI application
+   whose logic lives in `Mango.dll`.
+3. Decompiling with `ilspycmd` shows the relevant types: `SharedCommands`,
+   `Mip001CommandProtocol`, `BleProfileRegistry` and `Mip001HardwareSpec`. An XML
+   documentation file ships alongside describing the API surface.
 4. **Static `byte[]` constants do not survive decompilation** — ILSpy emits
    `RuntimeHelpers.InitializeArray(... LdMemberToken)` instead of values, and the assembly
    is a Windows ReadyToRun image so it will not load on macOS to be reflected over. Read
    them out of the PE metadata: parse the `.cctor` IL, follow each `ldtoken` to its
    `<PrivateImplementationDetails>` field, and resolve the FieldRVA with
    `System.Reflection.Metadata` plus `PEReader.GetSectionData`. Arrays of one or two bytes
-   are built inline with `stelem.i1` rather than `InitializeArray`, so handle both shapes.
+   are built inline with `stelem.i1` rather than `InitializeArray`, so both shapes matter.
+
+The command values above are facts about a wire protocol, which is what makes an
+independent implementation possible at all.

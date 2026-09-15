@@ -24,7 +24,7 @@
           # pyusb loads libusb through ctypes at runtime, so it has to be told
           # where the library actually is inside the store.
           makeWrapperArgs = [
-            "--set NEMONIC_LIBUSB ${pkgs.libusb1}/lib/libusb-1.0${pkgs.stdenv.hostPlatform.extensions.sharedLibrary}"
+            "--set-default NEMONIC_LIBUSB ${pkgs.libusb1}/lib/libusb-1.0${pkgs.stdenv.hostPlatform.extensions.sharedLibrary}"
           ];
 
           nativeCheckInputs = [ pkgs.python3Packages.pytestCheckHook ];

@@ -13,11 +13,15 @@ if ! command -v uvx >/dev/null 2>&1; then
   exit 1
 fi
 
+# Pinned: an unpinned ruff starts failing unrelated commits the day it ships a
+# new rule. Bump this deliberately, together with the dev extra in pyproject.
+RUFF="ruff@"
+
 echo "pre-commit: ruff check"
-uvx ruff check .
+uvx "$RUFF" check .
 
 echo "pre-commit: ruff format --check"
-uvx ruff format --check .
+uvx "$RUFF" format --check .
 
 echo "pre-commit: pytest"
 uvx --with pytest --with pillow --with pyusb --with bleak \

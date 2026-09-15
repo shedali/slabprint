@@ -1,0 +1,32 @@
+name: ci
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  check:
+    # The same three gates as the pre-commit hook, so a contributor without the
+    # hook installed still cannot merge something that would fail locally.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+
+      - name: ruff check
+        run: uvx ruff@0.16.7 check .
+
+      - name: ruff format --check
+        run: uvx ruff@0.16.7 format --check .
+
+      - name: pytest
+        run: uvx --with pytest --with pillow --with pyusb --with bleak pytest -q
+
+  nix:
+    # Proves the flake builds and runs the suite in its sandbox.
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cachix/install-nix-action@v30
+      - run: nix build .

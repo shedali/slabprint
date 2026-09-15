@@ -9,6 +9,7 @@ description = "Print to a MangoSlab nemonic sticky-note printer, with no vendor 
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
+authors = [{ name = "Franz Sittampalam" }]
 keywords = ["thermal-printer", "escpos", "eink", "sticky-notes", "nemonic", "mangoslab"]
 classifiers = [
   "Environment :: Console",
@@ -29,11 +30,11 @@ dependencies = [
 nemonic = "nemonic.cli:run"
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff>=0.6"]
+dev = ["pytest>=8", "ruff==0.16.7"]
 
 [project.urls]
 Homepage = "https://github.com/shedali/nemonic"
-Documentation = "https://github.com/shedali/nemonic/blob/main/PROTOCOL.md"
+Documentation = "https://github.com/shedali/nemonic/blob/master/PROTOCOL.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/nemonic"]
@@ -69,4 +70,7 @@ select = [
 "src/nemonic/cli.py" = ["T20"]
 "src/nemonic/server.py" = ["T20"]
 "src/nemonic/core.py" = ["T20"]
+# The queue runs unattended, so it reports skipped jobs on stderr rather than
+# failing silently.
+"src/nemonic/jobs.py" = ["T20"]
 "tests/*" = ["ARG"]

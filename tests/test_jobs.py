@@ -109,7 +109,8 @@ def test_run_due_records_a_failure_rather_than_raising():
     jobs.add(NOW, ["print", "x"])
     finished = jobs.run_due(["false"], now=NOW)
     assert finished[0]["exit"] != 0
-    # A failed job is still consumed, so a broken job cannot wedge the queue.
+    # A job that RUNS and exits nonzero is still consumed. That says nothing
+    # about a job that cannot be run at all — see the malformed-job tests below.
     assert jobs.pending() == []
 
 
@@ -117,3 +118,50 @@ def test_run_due_does_nothing_when_nothing_is_due():
     jobs.add(NOW + dt.timedelta(days=1), ["print", "x"])
     assert jobs.run_due(["true"], now=NOW) == []
     assert len(jobs.pending()) == 1
+
+
+def write_job(tmp_path, name, payload):
+    directory = tmp_path / "queue"
+    directory.mkdir(parents=True, exist_ok=True)
+    (directory / name).write_text(payload)
+
+
+def test_a_job_without_argv_is_skipped_not_fatal(tmp_path):
+    # Sorts first by epoch prefix, so if it wedged anything it would wedge this.
+    write_job(tmp_path, "1000000000-bad.json", json.dumps({"id": "bad", "at_epoch": 1}))
+    jobs.add(NOW, ["print", "good"])
+    finished = jobs.run_due(["true"], now=NOW)
+    assert [job["argv"][1] for job in finished] == ["good"]
+
+
+def test_a_malformed_job_cannot_block_later_jobs_forever(tmp_path):
+    write_job(tmp_path, "1000000000-bad.json", json.dumps({"nonsense": True}))
+    jobs.add(NOW, ["print", "good"])
+    assert len(jobs.run_due(["true"], now=NOW)) == 1
+    # And the queue is now clear of runnable work rather than stuck on the bad file.
+    assert jobs.pending() == []
+
+
+@pytest.mark.parametrize(
+    "payload",
+    [
+        '{"id": "x", "at_epoch": 1}',  # no argv
+        '{"id": "x", "at_epoch": 1, "argv": "print"}',  # argv not a list
+        '{"id": "x", "at_epoch": 1, "argv": [1, 2]}',  # argv not strings
+        '{"at_epoch": 1, "argv": ["print"]}',  # no id
+        '{"id": "x", "argv": ["print"]}',  # no due time
+        "[]",  # not even an object
+    ],
+)
+def test_pending_rejects_anything_it_could_not_run(tmp_path, payload):
+    write_job(tmp_path, "1000000000-bad.json", payload)
+    assert jobs.pending() == []
+
+
+def test_a_claimed_job_is_not_run_twice(tmp_path):
+    """run_due renames before running, so an overlapping runner finds nothing."""
+    jobs.add(NOW, ["print", "once"])
+    first = jobs.run_due(["true"], now=NOW)
+    second = jobs.run_due(["true"], now=NOW)
+    assert len(first) == 1
+    assert second == []

@@ -36,6 +36,8 @@ with `nix develop`.
 pipx install nemonic          # or: uv tool install nemonic
 ```
 
+(Not published to PyPI yet — install from a checkout for now.)
+
 Needs Python 3.10+, plus libusb for the USB transport. If it is installed somewhere
 unusual, point `NEMONIC_LIBUSB` at the library file.
 
@@ -102,12 +104,15 @@ calls `nemonic queue run`, so put that on a timer — every minute is plenty:
 ### Printing from elsewhere on the network
 
 ```bash
-nemonic serve --token secret
-curl -X POST --data-binary @note.txt -H "X-Token: secret" http://printer-host:8719/print
+export NEMONIC_TOKEN=secret            # not --token: a flag is visible in `ps`
+nemonic serve --host 0.0.0.0
+curl -X POST --data-binary @note.txt -H "X-Token: $NEMONIC_TOKEN" \
+     http://printer-host:8719/print
 ```
 
-There is no TLS and a header token is not real authentication, so only do this on a
-network you trust.
+It listens on `127.0.0.1` unless you ask otherwise, because opening a print service
+to the whole network should be deliberate. There is no TLS and a header token is not
+real authentication, so only do this on a network you trust.
 
 ## Options
 
@@ -172,10 +177,11 @@ into something that proves nothing.
 **"printer not found on USB"** — almost always a **charge-only USB cable**. The printer
 powers up and never appears on the bus, silently. Try a known data cable first.
 
-**"printer is not accepting data"** — the printer can wedge into a state where it
+**"printer is not accepting data"**, or `nemonic status` saying it is not reachable
+while the printer is plainly plugged in — the printer can wedge into a state where it
 enumerates and answers control transfers but refuses all print data, on both USB and
-Bluetooth. **Power-cycle it.** Then check the cartridge is seated and the cover closed;
-`nemonic status` will report those.
+Bluetooth. **Power-cycle it.** Also check the cartridge is seated and the cover closed;
+`nemonic status` reports cover, paper, overheating and cutter faults.
 
 **Nothing happens over Bluetooth** — make sure nothing else holds the printer, and
 ignore any `/dev/cu.*` serial port it creates when paired. Classic SPP carries no print
@@ -184,3 +190,12 @@ data; see PROTOCOL.md.
 ## Licence
 
 MIT.
+
+## Not affiliated with MangoSlab
+
+This is an independent, unofficial project. It is not affiliated with, endorsed by, or
+supported by MangoSlab. *nemonic* and *MangoSlab* are the trademarks of their owner and
+are used here only to say which printer this software talks to.
+
+The protocol was determined by observing the vendor's own published application in order
+to interoperate with hardware the author owns. No vendor code is reproduced here.

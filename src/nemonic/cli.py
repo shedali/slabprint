@@ -104,12 +104,15 @@ def build_parser():
     queue.add_argument("action", nargs="?", default="list", choices=["list", "run", "clear"])
 
     serve = sub.add_parser("serve", help="HTTP print service for the local network")
-    serve.add_argument("--host", default="0.0.0.0")
+    # Loopback by default: opening a print service to the whole network should
+    # be a deliberate act, not what happens if you forget a flag.
+    serve.add_argument("--host", default="127.0.0.1")
     serve.add_argument("--port", type=int, default=8719)
     serve.add_argument(
         "--token",
         default=os.environ.get("NEMONIC_TOKEN"),
-        help="shared secret required in the X-Token header",
+        help="shared secret required in the X-Token header; prefer the "
+        "NEMONIC_TOKEN environment variable, since a flag is visible in ps",
     )
 
     sub.add_parser("status", help="report whether the printer is reachable")
@@ -121,6 +124,11 @@ def main() -> int:
 
     if args.command == "print":
         if args.self_test:
+            if args.preview:
+                raise SystemExit(
+                    "--self-test prints the printer's own built-in page, so there is "
+                    "nothing to preview"
+                )
             print(core.send(core.SELF_TEST, args.transport, args.ble_address))
         else:
             print(emit(compose(args), args))
@@ -166,12 +174,23 @@ def main() -> int:
 
 
 def run() -> int:
-    """Console entry point: turn a printer fault into a clean error, not a traceback."""
+    """Console entry point: report failures as messages rather than tracebacks.
+
+    Bad input reaches a surprising variety of libraries — Pillow raises its own
+    errors for an unreadable image or an unknown preview extension, and the date
+    parser raises ValueError with a message already written for a human. A
+    traceback helps nobody holding a printer.
+    """
     try:
         return main()
     except core.PrinterError as exc:
         print(f"print failed: {exc}", file=sys.stderr)
         return 1
+    except (ValueError, OSError) as exc:
+        print(f"nemonic: {exc}", file=sys.stderr)
+        return 1
+    except KeyboardInterrupt:
+        return 130
 
 
 if __name__ == "__main__":
