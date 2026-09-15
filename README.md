@@ -54,6 +54,8 @@ slabprint print "Buy milk"                        # a line of text
 slabprint print "# Shopping" "milk" "bread"       # "# " makes a heading
 cat notes.txt | slabprint print --size 30         # from stdin
 slabprint print --image photo.jpg --dither        # a picture
+pbpaste | slabprint print --size 30              # whatever is on the clipboard
+pngpaste - | slabprint print --image - --dither  # a clipboard IMAGE (macOS)
 slabprint print --self-test                       # the printer's own test page
 slabprint print --columns 2 --size 20 < list.txt  # long checklist, half the paper
 slabprint print --box "Back in 10 minutes"            # framed, like a card
@@ -126,7 +128,7 @@ real authentication, so only do this on a network you trust.
 | `--size N` | font size, default 36. 28–32 suits lists, 44+ suits headlines |
 | `--columns N` | lay the text out in N columns — roughly halves the paper a long checklist uses |
 | `--box` | draw a frame around the printed area, sized to the content |
-| `--image PATH` | print an image, scaled to 576 px wide |
+| `--image PATH` | print an image, scaled to 576 px wide. `-` reads it from stdin |
 | `--dither` | Floyd–Steinberg, for photographs. The default threshold suits text |
 | `--copies N` | number of copies |
 | `--no-cut` | leave the note uncut |

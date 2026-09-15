@@ -4,6 +4,8 @@
 
 from __future__ import annotations
 
+import io
+import sys
 import textwrap
 import warnings
 
@@ -196,7 +198,7 @@ def render_text(
 
 
 def load_image(
-    path: str,
+    source,
     dither: bool = False,
     width: int = WIDTH_PX,
     max_height: int = MAX_HEIGHT_PX,
@@ -204,10 +206,19 @@ def load_image(
 ) -> Image.Image:
     """Load an image, flatten transparency, scale to `width`, reduce to `mode`.
 
+    `source` is a path, or "-" to read the image from standard input, which is
+    what lets a clipboard tool or a download pipe straight into a print.
+
     mode "1" is the printer's 1-bit format; pass "L" or "RGB" for displays that
     take greyscale or colour.
     """
-    image = Image.open(path)
+    if source == "-":
+        # Buffer it: Pillow seeks while sniffing the format, and a pipe cannot.
+        data = sys.stdin.buffer.read()
+        if not data:
+            raise ValueError("no image data on standard input")
+        source = io.BytesIO(data)
+    image = Image.open(source)
     if image.mode in ("RGBA", "LA", "P"):
         flattened = Image.new("RGB", image.size, "white")
         image = image.convert("RGBA")

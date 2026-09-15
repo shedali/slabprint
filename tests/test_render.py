@@ -2,6 +2,8 @@
 # Copyright (c) 2026 Franz Sittampalam
 """Bitmap packing and text layout."""
 
+import io
+
 import pytest
 from PIL import Image
 
@@ -177,3 +179,23 @@ def test_a_box_leaves_room_for_the_frame():
 def test_a_box_works_with_columns():
     image = render.render_text([f"item {n}" for n in range(20)], size=24, columns=2, box=True)
     assert image.getpixel((image.width // 2, 18 // 2)) == BLACK
+
+
+def test_an_image_can_be_read_from_stdin(tmp_path, monkeypatch):
+    source = tmp_path / "in.png"
+    Image.new("RGB", (120, 60), "white").save(source)
+
+    class FakeStdin:
+        buffer = io.BytesIO(source.read_bytes())
+
+    monkeypatch.setattr(render.sys, "stdin", FakeStdin)
+    assert render.load_image("-").width == render.WIDTH_PX
+
+
+def test_empty_stdin_is_a_clean_error(monkeypatch):
+    class FakeStdin:
+        buffer = io.BytesIO(b"")
+
+    monkeypatch.setattr(render.sys, "stdin", FakeStdin)
+    with pytest.raises(ValueError, match="no image data"):
+        render.load_image("-")

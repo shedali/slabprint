@@ -87,7 +87,9 @@ def build_parser():
 
     printer = sub.add_parser("print", help="print text, stdin or an image")
     printer.add_argument("text", nargs="*", default=[])
-    printer.add_argument("--image", help="image file, scaled to 576px wide")
+    printer.add_argument(
+        "--image", metavar="FILE", help='image file, or "-" to read one from stdin'
+    )
     printer.add_argument(
         "--dither", action="store_true", help="dither photographs; the default threshold suits text"
     )
