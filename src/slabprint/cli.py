@@ -124,8 +124,31 @@ def build_parser():
     return parser
 
 
+SUBCOMMANDS = frozenset({"print", "schedule", "queue", "serve", "status"})
+
+
+def with_default_command(argv: list[str]) -> list[str]:
+    """Let printing be the default, since it is what the tool is mostly for.
+
+        slabprint "Buy milk"        same as  slabprint print "Buy milk"
+        pbpaste | slabprint         same as  slabprint print
+        slabprint --image x.png     same as  slabprint print --image x.png
+
+    A word that IS a subcommand still selects it, so `slabprint status` reports
+    the printer rather than printing the word. Print that word with
+    `slabprint print status`.
+    """
+    if argv and argv[0] in SUBCOMMANDS:
+        return argv
+    if argv and argv[0] in ("-h", "--help"):
+        return argv
+    if not argv and sys.stdin.isatty():
+        return argv  # no arguments and nothing piped in: show help
+    return ["print", *argv]
+
+
 def main() -> int:
-    args = build_parser().parse_args()
+    args = build_parser().parse_args(with_default_command(sys.argv[1:]))
 
     if args.command == "print":
         if args.self_test:

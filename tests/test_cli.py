@@ -66,3 +66,30 @@ def test_a_command_is_required():
 def test_entry_command_is_runnable():
     command = cli.entry_command()
     assert isinstance(command, list) and command
+
+
+def test_bare_text_defaults_to_printing():
+    assert cli.with_default_command(["hello"]) == ["print", "hello"]
+
+
+def test_a_leading_flag_defaults_to_printing():
+    assert cli.with_default_command(["--image", "x.png"]) == ["print", "--image", "x.png"]
+
+
+@pytest.mark.parametrize("command", sorted(cli.SUBCOMMANDS))
+def test_a_real_subcommand_is_left_alone(command):
+    assert cli.with_default_command([command, "x"]) == [command, "x"]
+
+
+def test_help_is_left_alone():
+    assert cli.with_default_command(["--help"]) == ["--help"]
+
+
+def test_no_arguments_with_a_pipe_means_print_from_stdin(monkeypatch):
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: False)
+    assert cli.with_default_command([]) == ["print"]
+
+
+def test_no_arguments_on_a_terminal_shows_help(monkeypatch):
+    monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: True)
+    assert cli.with_default_command([]) == []

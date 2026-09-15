@@ -49,7 +49,11 @@ On Linux you may need a udev rule, or root, to claim the USB interface.
 
 ## Use
 
+`print` is the default command, so it can be left out:
+
 ```bash
+slabprint "Buy milk"                              # shorthand
+pbpaste | slabprint                               # print the clipboard
 slabprint print "Buy milk"                        # a line of text
 slabprint print "# Shopping" "milk" "bread"       # "# " makes a heading
 cat notes.txt | slabprint print --size 30         # from stdin
