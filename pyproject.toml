@@ -28,9 +28,16 @@ dependencies = [
 [project.scripts]
 nemonic = "nemonic.cli:run"
 
+[project.optional-dependencies]
+dev = ["pytest>=8"]
+
 [project.urls]
 Homepage = "https://github.com/shedali/nemonic"
 Documentation = "https://github.com/shedali/nemonic/blob/main/PROTOCOL.md"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/nemonic"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]

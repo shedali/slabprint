@@ -147,6 +147,19 @@ bitmap, width_bytes, height = render.pack(render.render_text(["Hello"]))
 core.send(core.build_job(bitmap, width_bytes, height))
 ```
 
+## Development
+
+```bash
+nix develop                 # shell with every dependency
+pytest                      # the test suite
+nix build                   # builds and runs the tests
+```
+
+The tests cover protocol encoding, bitmap packing, text layout, the scheduled
+queue and the HTTP service. They need no printer. Anything that does need one —
+the USB and BLE transports — is deliberately left untested rather than mocked
+into something that proves nothing.
+
 ## Troubleshooting
 
 **"printer not found on USB"** — almost always a **charge-only USB cable**. The printer

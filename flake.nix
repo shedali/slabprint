@@ -27,8 +27,11 @@
             "--set NEMONIC_LIBUSB ${pkgs.libusb1}/lib/libusb-1.0${pkgs.stdenv.hostPlatform.extensions.sharedLibrary}"
           ];
 
-          # No test suite yet; the meaningful tests need a physical printer.
-          doCheck = false;
+          nativeCheckInputs = [ pkgs.python3Packages.pytestCheckHook ];
+          # The suite is pure logic — protocol encoding, bitmap packing, layout,
+          # the queue and the HTTP service. Anything needing a real printer is
+          # deliberately not tested here.
+          pytestFlags = [ "tests" ];
 
           meta = with pkgs.lib; {
             description = "Print to a MangoSlab nemonic sticky-note printer, with no vendor driver";
