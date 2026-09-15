@@ -1,0 +1,36 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "nemonic"
+version = "0.1.0"
+description = "Print to a MangoSlab nemonic sticky-note printer, with no vendor driver"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+keywords = ["thermal-printer", "escpos", "eink", "sticky-notes", "nemonic", "mangoslab"]
+classifiers = [
+  "Environment :: Console",
+  "Intended Audience :: End Users/Desktop",
+  "License :: OSI Approved :: MIT License",
+  "Operating System :: MacOS",
+  "Operating System :: POSIX :: Linux",
+  "Programming Language :: Python :: 3",
+  "Topic :: Printing",
+]
+dependencies = [
+  "pillow>=10",
+  "pyusb>=1.2",
+  "bleak>=0.21",
+]
+
+[project.scripts]
+nemonic = "nemonic.cli:run"
+
+[project.urls]
+Homepage = "https://github.com/shedali/nemonic"
+Documentation = "https://github.com/shedali/nemonic/blob/main/PROTOCOL.md"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/nemonic"]
