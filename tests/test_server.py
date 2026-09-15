@@ -8,7 +8,7 @@ from http.server import ThreadingHTTPServer
 
 import pytest
 
-from nemonic import server
+from slabprint import server
 
 
 @pytest.fixture

@@ -2,7 +2,7 @@
 
 import pytest
 
-from nemonic import cli
+from slabprint import cli
 
 
 def parse(argv):

@@ -1,12 +1,12 @@
 """nemonic — print to a MangoSlab nemonic MIP-001 sticky-note printer.
 
-  nemonic print "Buy milk"                  print a line of text
-  cat notes.md | nemonic print --size 30    print from stdin
-  nemonic print --image photo.jpg --dither  print a picture
-  nemonic schedule --at 07:30 -- print "Bins out"   print it later
-  nemonic queue run                         run anything now due
-  nemonic serve --token secret              print service for the LAN
-  nemonic status                            is the printer reachable?
+  slabprint print "Buy milk"                  print a line of text
+  cat notes.md | slabprint print --size 30    print from stdin
+  slabprint print --image photo.jpg --dither  print a picture
+  slabprint schedule --at 07:30 -- print "Bins out"   print it later
+  slabprint queue run                         run anything now due
+  slabprint serve --token secret              print service for the LAN
+  slabprint status                            is the printer reachable?
 
 Add --preview out.png to any print to render without using paper.
 """
@@ -23,8 +23,8 @@ from . import core, jobs, render, server
 
 def entry_command() -> list[str]:
     """How to re-invoke this CLI, for queued jobs run by a timer."""
-    installed = shutil.which("nemonic")
-    return [installed] if installed else [sys.executable, "-m", "nemonic"]
+    installed = shutil.which("slabprint")
+    return [installed] if installed else [sys.executable, "-m", "slabprint"]
 
 
 def compose(args) -> object:
@@ -78,7 +78,7 @@ def add_print_options(parser):
 
 def build_parser():
     parser = argparse.ArgumentParser(
-        prog="nemonic", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+        prog="slabprint", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
     )
     sub = parser.add_subparsers(dest="command", required=True)
 
@@ -110,9 +110,9 @@ def build_parser():
     serve.add_argument("--port", type=int, default=8719)
     serve.add_argument(
         "--token",
-        default=os.environ.get("NEMONIC_TOKEN"),
+        default=os.environ.get("SLABPRINT_TOKEN"),
         help="shared secret required in the X-Token header; prefer the "
-        "NEMONIC_TOKEN environment variable, since a flag is visible in ps",
+        "SLABPRINT_TOKEN environment variable, since a flag is visible in ps",
     )
 
     sub.add_parser("status", help="report whether the printer is reachable")
@@ -137,17 +137,17 @@ def main() -> int:
         rest = [token for token in args.rest if token != "--"]
         if not rest:
             raise SystemExit(
-                "nothing to schedule, e.g. nemonic schedule --at 07:30 -- print 'Bins out'"
+                "nothing to schedule, e.g. slabprint schedule --at 07:30 -- print 'Bins out'"
             )
         job = jobs.add(jobs.parse_when(args.at), rest, args.label)
-        print(f"queued {job['id']} for {job['at']}: nemonic {' '.join(rest)}")
+        print(f"queued {job['id']} for {job['at']}: slabprint {' '.join(rest)}")
 
     elif args.command == "queue":
         if args.action == "list":
             queued = jobs.pending()
             for job in queued:
                 label = f"   ({job['label']})" if job.get("label") else ""
-                print(f"{job['id']}  {job['at']}  nemonic {' '.join(job['argv'])}{label}")
+                print(f"{job['id']}  {job['at']}  slabprint {' '.join(job['argv'])}{label}")
             print(f"{len(queued)} queued")
         elif args.action == "run":
             finished = jobs.run_due(entry_command())
@@ -187,7 +187,7 @@ def run() -> int:
         print(f"print failed: {exc}", file=sys.stderr)
         return 1
     except (ValueError, OSError) as exc:
-        print(f"nemonic: {exc}", file=sys.stderr)
+        print(f"slabprint: {exc}", file=sys.stderr)
         return 1
     except KeyboardInterrupt:
         return 130

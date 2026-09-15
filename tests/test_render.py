@@ -3,7 +3,7 @@
 import pytest
 from PIL import Image
 
-from nemonic import core, render
+from slabprint import core, render
 
 # PIL mode "1" stores black as 0 and white as 255, even though it is 1 bit.
 BLACK, WHITE = 0, 255

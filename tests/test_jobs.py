@@ -5,7 +5,7 @@ import json
 
 import pytest
 
-from nemonic import jobs
+from slabprint import jobs
 
 NOW = dt.datetime(2026, 9, 15, 12, 0, 0)
 

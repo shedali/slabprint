@@ -109,8 +109,8 @@ def build_job(
 
 def _find_libusb() -> str | None:
     """Locate libusb, preferring an explicit override, then the usual places."""
-    if os.environ.get("NEMONIC_LIBUSB"):
-        return os.environ["NEMONIC_LIBUSB"]
+    if os.environ.get("SLABPRINT_LIBUSB"):
+        return os.environ["SLABPRINT_LIBUSB"]
     if found := ctypes.util.find_library("usb-1.0"):
         return found
     for candidate in (
@@ -234,7 +234,7 @@ async def _ble_send(job: bytes, address: str | None, chunk: int, settle: float) 
                 device = candidate
                 break
     if device is None:
-        raise PrinterError("no nemonic found over BLE")
+        raise PrinterError("no nemonic printer found over BLE")
 
     async with BleakClient(device, timeout=25.0) as client:
         for i in range(0, len(job), chunk):

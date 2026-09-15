@@ -11,8 +11,8 @@
     in
     {
       packages = forAllSystems (pkgs: rec {
-        nemonic = pkgs.python3Packages.buildPythonApplication {
-          pname = "nemonic";
+        slabprint = pkgs.python3Packages.buildPythonApplication {
+          pname = "slabprint";
           version = "0.1.0";
           pyproject = true;
           src = self;
@@ -24,7 +24,7 @@
           # pyusb loads libusb through ctypes at runtime, so it has to be told
           # where the library actually is inside the store.
           makeWrapperArgs = [
-            "--set-default NEMONIC_LIBUSB ${pkgs.libusb1}/lib/libusb-1.0${pkgs.stdenv.hostPlatform.extensions.sharedLibrary}"
+            "--set-default SLABPRINT_LIBUSB ${pkgs.libusb1}/lib/libusb-1.0${pkgs.stdenv.hostPlatform.extensions.sharedLibrary}"
           ];
 
           nativeCheckInputs = [ pkgs.python3Packages.pytestCheckHook ];
@@ -35,21 +35,21 @@
 
           meta = with pkgs.lib; {
             description = "Print to a MangoSlab nemonic sticky-note printer, with no vendor driver";
-            homepage = "https://github.com/shedali/nemonic";
+            homepage = "https://github.com/shedali/slabprint";
             license = licenses.mit;
-            mainProgram = "nemonic";
+            mainProgram = "slabprint";
             platforms = platforms.unix;
           };
         };
-        default = nemonic;
+        default = slabprint;
       });
 
       apps = forAllSystems (pkgs: rec {
-        nemonic = {
+        slabprint = {
           type = "app";
-          program = "${self.packages.${pkgs.system}.nemonic}/bin/nemonic";
+          program = "${self.packages.${pkgs.system}.slabprint}/bin/slabprint";
         };
-        default = nemonic;
+        default = slabprint;
       });
 
       devShells = forAllSystems (pkgs: {

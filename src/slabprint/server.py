@@ -19,7 +19,7 @@ REQUEST_TIMEOUT_SECONDS = 15
 
 def make_handler(print_lines, token):
     class Handler(BaseHTTPRequestHandler):
-        server_version = "nemonic"
+        server_version = "slabprint"
         protocol_version = "HTTP/1.1"
         timeout = REQUEST_TIMEOUT_SECONDS
 
@@ -94,5 +94,5 @@ def serve(print_lines, host: str = "127.0.0.1", port: int = 8719, token: str | N
 
     # Threading, so one slow or idle client cannot block every other request.
     httpd = ThreadingHTTPServer((host, port), make_handler(print_lines, token))
-    print(f"nemonic listening on http://{host}:{port}  (POST /print)")
+    print(f"slabprint listening on http://{host}:{port}  (POST /print)")
     httpd.serve_forever()

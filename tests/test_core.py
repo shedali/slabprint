@@ -3,7 +3,7 @@ asserted literally rather than via the helpers that produce them."""
 
 import pytest
 
-from nemonic import core
+from slabprint import core
 
 
 def test_set_copies_is_esc_c():

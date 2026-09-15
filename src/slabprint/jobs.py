@@ -15,7 +15,7 @@ import sys
 import uuid
 from pathlib import Path
 
-STATE_DIR = Path(os.environ.get("NEMONIC_STATE", "~/.local/state/nemonic")).expanduser()
+STATE_DIR = Path(os.environ.get("SLABPRINT_STATE", "~/.local/state/slabprint")).expanduser()
 QUEUE_DIR = STATE_DIR / "queue"
 DONE_DIR = STATE_DIR / "done"
 
@@ -100,10 +100,10 @@ def pending() -> list[dict]:
         try:
             job = json.loads(path.read_text())
         except (OSError, ValueError):
-            print(f"nemonic: ignoring unreadable job {path.name}", file=sys.stderr)
+            print(f"slabprint: ignoring unreadable job {path.name}", file=sys.stderr)
             continue
         if not is_runnable(job):
-            print(f"nemonic: ignoring malformed job {path.name}", file=sys.stderr)
+            print(f"slabprint: ignoring malformed job {path.name}", file=sys.stderr)
             continue
         job["path"] = path
         jobs.append(job)
