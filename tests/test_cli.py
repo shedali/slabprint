@@ -1,4 +1,5 @@
 """Argument parsing. The commands themselves need a printer; the parser does not."""
+
 import pytest
 
 from nemonic import cli

@@ -4,6 +4,7 @@ Deliberately minimal: standard library only, one endpoint, optional shared token
 Bind to a LAN address only on a network you trust — there is no TLS and a token
 in a header is not real authentication.
 """
+
 from __future__ import annotations
 
 from http.server import BaseHTTPRequestHandler, HTTPServer

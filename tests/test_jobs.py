@@ -1,4 +1,5 @@
 """The scheduled-print queue."""
+
 import datetime as dt
 import json
 
@@ -12,16 +13,19 @@ NOW = dt.datetime(2026, 9, 15, 12, 0, 0)
 @pytest.fixture(autouse=True)
 def isolated_queue(tmp_path, monkeypatch):
     """Never touch the real queue in ~/.local/state."""
-    monkeypatch.setattr(jobs, "QUEUE_DIR", str(tmp_path / "queue"))
-    monkeypatch.setattr(jobs, "DONE_DIR", str(tmp_path / "done"))
+    monkeypatch.setattr(jobs, "QUEUE_DIR", tmp_path / "queue")
+    monkeypatch.setattr(jobs, "DONE_DIR", tmp_path / "done")
 
 
-@pytest.mark.parametrize("text, expected", [
-    ("+30m", dt.datetime(2026, 9, 15, 12, 30)),
-    ("+2h", dt.datetime(2026, 9, 15, 14, 0)),
-    ("+3d", dt.datetime(2026, 9, 18, 12, 0)),
-    ("+1w", dt.datetime(2026, 9, 22, 12, 0)),
-])
+@pytest.mark.parametrize(
+    "text, expected",
+    [
+        ("+30m", dt.datetime(2026, 9, 15, 12, 30)),
+        ("+2h", dt.datetime(2026, 9, 15, 14, 0)),
+        ("+3d", dt.datetime(2026, 9, 18, 12, 0)),
+        ("+1w", dt.datetime(2026, 9, 22, 12, 0)),
+    ],
+)
 def test_parse_when_handles_relative_offsets(text, expected):
     assert jobs.parse_when(text, now=NOW) == expected
 

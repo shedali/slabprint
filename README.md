@@ -150,10 +150,17 @@ core.send(core.build_job(bitmap, width_bytes, height))
 ## Development
 
 ```bash
+./scripts/install-hooks.sh  # install the commit gate — do this first
 nix develop                 # shell with every dependency
 pytest                      # the test suite
 nix build                   # builds and runs the tests
 ```
+
+The pre-commit hook runs `ruff check`, `ruff format --check` and the full test
+suite, and every one of them is a hard failure. It fetches its tools with
+[uvx](https://docs.astral.sh/uv/), so only `uv` needs to be installed; a missing
+toolchain fails the commit rather than skipping the check, because a gate that
+quietly does nothing is worse than no gate.
 
 The tests cover protocol encoding, bitmap packing, text layout, the scheduled
 queue and the HTTP service. They need no printer. Anything that does need one —

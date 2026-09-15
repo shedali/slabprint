@@ -1,0 +1,26 @@
+#!/usr/bin/env bash
+# Strict pre-commit gate: lint, format check, then the full test suite.
+#
+# Deliberately hard. Every check is a hard failure, and a missing toolchain is a
+# failure too rather than a silent skip — a gate that quietly does nothing is
+# worse than no gate, because you stop reading it.
+#
+# Tools come from uvx, so nothing needs to be installed first beyond uv itself.
+set -euo pipefail
+
+if ! command -v uvx >/dev/null 2>&1; then
+  echo "pre-commit: uvx not found. Install uv: https://docs.astral.sh/uv/" >&2
+  exit 1
+fi
+
+echo "pre-commit: ruff check"
+uvx ruff check .
+
+echo "pre-commit: ruff format --check"
+uvx ruff format --check .
+
+echo "pre-commit: pytest"
+uvx --with pytest --with pillow --with pyusb --with bleak \
+    pytest -q --strict-markers --strict-config
+
+echo "pre-commit: ok"

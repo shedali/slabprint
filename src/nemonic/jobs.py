@@ -4,6 +4,7 @@ Each job is one JSON file named "<epoch>-<id>.json", so the directory sorts by
 due time and any job can be inspected or deleted with ordinary file tools. A
 runner (launchd, cron, systemd timer) calls run_due() periodically.
 """
+
 from __future__ import annotations
 
 import datetime as dt
@@ -11,11 +12,11 @@ import json
 import os
 import subprocess
 import uuid
+from pathlib import Path
 
-STATE_DIR = os.environ.get("NEMONIC_STATE",
-                           os.path.expanduser("~/.local/state/nemonic"))
-QUEUE_DIR = os.path.join(STATE_DIR, "queue")
-DONE_DIR = os.path.join(STATE_DIR, "done")
+STATE_DIR = Path(os.environ.get("NEMONIC_STATE", "~/.local/state/nemonic")).expanduser()
+QUEUE_DIR = STATE_DIR / "queue"
+DONE_DIR = STATE_DIR / "done"
 
 RELATIVE_UNITS = {"m": "minutes", "h": "hours", "d": "days", "w": "weeks"}
 ABSOLUTE_FORMATS = ("%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M", "%Y-%m-%d", "%H:%M")
@@ -39,44 +40,39 @@ def parse_when(text: str, now: dt.datetime | None = None) -> dt.datetime:
         except ValueError:
             continue
         if fmt == "%H:%M":
-            parsed = now.replace(hour=parsed.hour, minute=parsed.minute,
-                                 second=0, microsecond=0)
+            parsed = now.replace(hour=parsed.hour, minute=parsed.minute, second=0, microsecond=0)
             if parsed <= now:
                 parsed += dt.timedelta(days=1)
         return parsed
 
-    raise ValueError(f"cannot parse time {text!r}: "
-                     "try '2026-09-15 07:30', '07:30', or '+90m'")
+    raise ValueError(f"cannot parse time {text!r}: try '2026-09-15 07:30', '07:30', or '+90m'")
 
 
 def add(when: dt.datetime, argv: list[str], label: str | None = None) -> dict:
     """Queue a command to run at `when`. argv is passed to the nemonic CLI."""
-    os.makedirs(QUEUE_DIR, exist_ok=True)
-    job = {"id": uuid.uuid4().hex[:10],
-           "at": when.isoformat(timespec="minutes"),
-           "at_epoch": when.timestamp(),
-           "argv": argv,
-           "label": label,
-           "created": dt.datetime.now().isoformat(timespec="seconds")}
-    path = os.path.join(QUEUE_DIR, f"{int(when.timestamp())}-{job['id']}.json")
-    with open(path, "w") as handle:
-        json.dump(job, handle, indent=2)
+    QUEUE_DIR.mkdir(parents=True, exist_ok=True)
+    job = {
+        "id": uuid.uuid4().hex[:10],
+        "at": when.isoformat(timespec="minutes"),
+        "at_epoch": when.timestamp(),
+        "argv": argv,
+        "label": label,
+        "created": dt.datetime.now().isoformat(timespec="seconds"),
+    }
+    path = QUEUE_DIR / f"{int(when.timestamp())}-{job['id']}.json"
+    path.write_text(json.dumps(job, indent=2))
     job["path"] = path
     return job
 
 
 def pending() -> list[dict]:
     """Every queued job, earliest first."""
-    if not os.path.isdir(QUEUE_DIR):
+    if not QUEUE_DIR.is_dir():
         return []
     jobs = []
-    for name in sorted(os.listdir(QUEUE_DIR)):
-        if not name.endswith(".json"):
-            continue
-        path = os.path.join(QUEUE_DIR, name)
+    for path in sorted(QUEUE_DIR.glob("*.json")):
         try:
-            with open(path) as handle:
-                job = json.load(handle)
+            job = json.loads(path.read_text())
         except (OSError, ValueError):
             continue  # ignore a partially written or corrupt job
         job["path"] = path
@@ -87,7 +83,7 @@ def pending() -> list[dict]:
 def clear() -> int:
     removed = 0
     for job in pending():
-        os.remove(job["path"])
+        job["path"].unlink()
         removed += 1
     return removed
 
@@ -98,7 +94,7 @@ def run_due(command: list[str], now: dt.datetime | None = None) -> list[dict]:
     `command` is the nemonic entry point, e.g. ["/path/to/nemonic"].
     """
     now = (now or dt.datetime.now()).timestamp()
-    os.makedirs(DONE_DIR, exist_ok=True)
+    DONE_DIR.mkdir(parents=True, exist_ok=True)
     finished = []
 
     for job in pending():
@@ -110,9 +106,8 @@ def run_due(command: list[str], now: dt.datetime | None = None) -> list[dict]:
         job["output"] = (result.stdout + result.stderr).strip()[:2000]
 
         path = job.pop("path")
-        with open(os.path.join(DONE_DIR, os.path.basename(path)), "w") as handle:
-            json.dump(job, handle, indent=2)
-        os.remove(path)
+        (DONE_DIR / path.name).write_text(json.dumps(job, indent=2))
+        path.unlink()
         finished.append(job)
 
     return finished

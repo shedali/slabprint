@@ -5,13 +5,15 @@ service. It speaks ESC/POS. No vendor driver is required on any platform.
 
 See PROTOCOL.md for how this command set was derived and what every byte means.
 """
+
 from __future__ import annotations
 
 import asyncio
+import contextlib
 import ctypes.util
-import glob
 import os
 import subprocess
+from pathlib import Path
 
 # Hardware limits, from the vendor app's Mip001HardwareSpec.
 WIDTH_PX = 576
@@ -29,16 +31,15 @@ BLE_WRITE_CHAR = "00005001-d102-11e1-9b23-74f07d000000"
 BLE_NOTIFY_CHAR = "00005002-d102-11e1-9b23-74f07d000000"
 
 # ESC/POS commands.
-INIT = bytes([0x1B, 0x40])                      # ESC @
-EXECUTE_PRINT = bytes([0x1B, 0x50])             # print and cut
+INIT = bytes([0x1B, 0x40])  # ESC @
+EXECUTE_PRINT = bytes([0x1B, 0x50])  # print and cut
 EXECUTE_PRINT_NO_CUT = bytes([0x1B, 0x51])
 EXECUTE_CUT = bytes([0x1B, 0x69])
 SELF_TEST = bytes([0x1C, 0x7A, 0x53, 0x50])
 STATUS_QUERY = bytes([0x10, 0x04, 0x01])
 
 # Status bits, after masking the response byte with ~0x12.
-STATUS_BITS = {0x04: "cover open", 0x08: "overheated",
-               0x20: "out of paper", 0x40: "cutter jammed"}
+STATUS_BITS = {0x04: "cover open", 0x08: "overheated", 0x20: "out of paper", 0x40: "cutter jammed"}
 
 
 class PrinterError(RuntimeError):
@@ -52,9 +53,18 @@ def set_copies(n: int) -> bytes:
 
 def raster_command(width_bytes: int, height: int) -> bytes:
     """GS v 0 — raster bit image header. The MIP-001 magic number is 0."""
-    return bytes([0x1D, 0x76, 0x30, 0x00,
-                  width_bytes & 0xFF, (width_bytes >> 8) & 0xFF,
-                  height & 0xFF, (height >> 8) & 0xFF])
+    return bytes(
+        [
+            0x1D,
+            0x76,
+            0x30,
+            0x00,
+            width_bytes & 0xFF,
+            (width_bytes >> 8) & 0xFF,
+            height & 0xFF,
+            (height >> 8) & 0xFF,
+        ]
+    )
 
 
 def decode_status(byte_: int) -> list[str]:
@@ -63,19 +73,23 @@ def decode_status(byte_: int) -> list[str]:
     return [name for bit, name in STATUS_BITS.items() if masked & bit]
 
 
-def build_job(bitmap: bytes, width_bytes: int, height: int,
-              copies: int = 1, cut: bool = True) -> bytes:
+def build_job(
+    bitmap: bytes, width_bytes: int, height: int, copies: int = 1, cut: bool = True
+) -> bytes:
     """Assemble a complete print job from a packed 1-bit bitmap."""
-    return (INIT
-            + set_copies(copies)
-            + raster_command(width_bytes, height)
-            + bitmap
-            + (EXECUTE_PRINT if cut else EXECUTE_PRINT_NO_CUT))
+    return (
+        INIT
+        + set_copies(copies)
+        + raster_command(width_bytes, height)
+        + bitmap
+        + (EXECUTE_PRINT if cut else EXECUTE_PRINT_NO_CUT)
+    )
 
 
 # --------------------------------------------------------------------------
 # USB transport
 # --------------------------------------------------------------------------
+
 
 def _find_libusb() -> str | None:
     """Locate libusb, preferring an explicit override, then the usual places."""
@@ -83,22 +97,27 @@ def _find_libusb() -> str | None:
         return os.environ["NEMONIC_LIBUSB"]
     if found := ctypes.util.find_library("usb-1.0"):
         return found
-    for pattern in ("/opt/homebrew/lib/libusb-1.0.dylib",
-                    "/usr/local/lib/libusb-1.0.dylib",
-                    "/usr/lib/x86_64-linux-gnu/libusb-1.0.so.0"):
-        if os.path.exists(pattern):
-            return pattern
+    for candidate in (
+        "/opt/homebrew/lib/libusb-1.0.dylib",
+        "/usr/local/lib/libusb-1.0.dylib",
+        "/usr/lib/x86_64-linux-gnu/libusb-1.0.so.0",
+    ):
+        if Path(candidate).exists():
+            return candidate
     # Only real shared objects: a sibling .la libtool archive would match a
     # looser glob and then fail to load with a confusing "no backend" error.
-    for pattern in ("/nix/store/*libusb*/lib/libusb-1.0.dylib",
-                    "/nix/store/*libusb*/lib/libusb-1.0.so.0"):
-        if hits := sorted(glob.glob(pattern)):
-            return hits[-1]
+    for pattern in ("*libusb*/lib/libusb-1.0.dylib", "*libusb*/lib/libusb-1.0.so.0"):
+        if hits := sorted(Path("/nix/store").glob(pattern)):
+            return str(hits[-1])
     try:  # last resort on a Nix machine
-        out = subprocess.run(["nix", "build", "--no-link", "--print-out-paths", "nixpkgs#libusb1"],
-                             capture_output=True, text=True, timeout=600)
-        path = out.stdout.strip().splitlines()[-1] + "/lib/libusb-1.0.dylib"
-        return path if os.path.exists(path) else None
+        out = subprocess.run(
+            ["nix", "build", "--no-link", "--print-out-paths", "nixpkgs#libusb1"],
+            capture_output=True,
+            text=True,
+            timeout=600,
+        )
+        path = Path(out.stdout.strip().splitlines()[-1]) / "lib/libusb-1.0.dylib"
+        return str(path) if path.exists() else None
     except Exception:
         return None
 
@@ -115,19 +134,21 @@ def usb_open():
     if device is None:
         return None
 
-    interface = next((i for i in device.get_active_configuration()
-                      if i.bInterfaceClass == USB_PRINTER_CLASS), None)
+    interface = next(
+        (i for i in device.get_active_configuration() if i.bInterfaceClass == USB_PRINTER_CLASS),
+        None,
+    )
     if interface is None:
         return None
-    try:
+    # Already claimed by this process is fine; anything else surfaces on transfer.
+    with contextlib.suppress(Exception):
         usb.util.claim_interface(device, interface.bInterfaceNumber)
-    except Exception:
-        pass  # already claimed by us is fine
 
     def endpoint(direction):
         return usb.util.find_descriptor(
             interface,
-            custom_match=lambda e: usb.util.endpoint_direction(e.bEndpointAddress) == direction)
+            custom_match=lambda e: usb.util.endpoint_direction(e.bEndpointAddress) == direction,
+        )
 
     return device, endpoint(usb.util.ENDPOINT_OUT), endpoint(usb.util.ENDPOINT_IN)
 
@@ -147,10 +168,10 @@ def usb_send(job: bytes, chunk: int = 4096) -> str:
     except Exception as exc:
         raise PrinterError(
             f"printer is not accepting data ({exc}). Power-cycle it, and check the "
-            "cartridge is seated and the cover closed.") from exc
+            "cartridge is seated and the cover closed."
+        ) from exc
 
-    sent = sum(ep_out.write(job[i:i + chunk], timeout=15000)
-               for i in range(0, len(job), chunk))
+    sent = sum(ep_out.write(job[i : i + chunk], timeout=15000) for i in range(0, len(job), chunk))
     return f"sent {sent} bytes over USB"
 
 
@@ -172,6 +193,7 @@ def usb_status() -> list[str] | None:
 # Bluetooth LE transport
 # --------------------------------------------------------------------------
 
+
 async def _ble_send(job: bytes, address: str | None, chunk: int, settle: float) -> str:
     from bleak import BleakClient, BleakScanner
 
@@ -179,8 +201,9 @@ async def _ble_send(job: bytes, address: str | None, chunk: int, settle: float) 
     if address:
         device = await BleakScanner.find_device_by_address(address, timeout=15.0)
     if device is None:
-        for _, (candidate, advert) in (await BleakScanner.discover(
-                timeout=15.0, return_adv=True)).items():
+        for _, (candidate, advert) in (
+            await BleakScanner.discover(timeout=15.0, return_adv=True)
+        ).items():
             name = (candidate.name or advert.local_name or "").lower()
             if BLE_SERVICE in [u.lower() for u in advert.service_uuids] or "nemonic" in name:
                 device = candidate
@@ -190,14 +213,13 @@ async def _ble_send(job: bytes, address: str | None, chunk: int, settle: float) 
 
     async with BleakClient(device, timeout=25.0) as client:
         for i in range(0, len(job), chunk):
-            await client.write_gatt_char(BLE_WRITE_CHAR, job[i:i + chunk], response=False)
+            await client.write_gatt_char(BLE_WRITE_CHAR, job[i : i + chunk], response=False)
             await asyncio.sleep(0.02)
         await asyncio.sleep(settle)  # hold the link while the printer works
     return f"sent {len(job)} bytes over BLE"
 
 
-def ble_send(job: bytes, address: str | None = None,
-             chunk: int = 180, settle: float = 6.0) -> str:
+def ble_send(job: bytes, address: str | None = None, chunk: int = 180, settle: float = 6.0) -> str:
     return asyncio.run(_ble_send(job, address, chunk, settle))
 
 

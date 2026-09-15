@@ -1,5 +1,5 @@
 """Bitmap packing and text layout."""
-import pytest
+
 from PIL import Image
 
 from nemonic import core, render
@@ -93,13 +93,13 @@ def test_render_text_never_exceeds_the_maximum_height():
 
 def test_columns_are_shorter_than_one_column():
     lines = [f"item {n}" for n in range(40)]
-    assert (render.render_text(lines, columns=2).height
-            < render.render_text(lines, columns=1).height)
+    assert render.render_text(lines, columns=2).height < render.render_text(lines, columns=1).height
 
 
 def test_a_rule_can_be_written_either_way():
-    assert (render.render_text(["a", "---", "b"]).height
-            == render.render_text(["a", "___", "b"]).height)
+    assert (
+        render.render_text(["a", "---", "b"]).height == render.render_text(["a", "___", "b"]).height
+    )
 
 
 def test_a_heading_is_taller_than_plain_text():

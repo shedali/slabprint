@@ -1,4 +1,5 @@
 """The HTTP print service."""
+
 import threading
 import urllib.error
 import urllib.request

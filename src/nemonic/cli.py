@@ -10,6 +10,7 @@
 
 Add --preview out.png to any print to render without using paper.
 """
+
 from __future__ import annotations
 
 import argparse
@@ -26,7 +27,7 @@ def entry_command() -> list[str]:
     return [installed] if installed else [sys.executable, "-m", "nemonic"]
 
 
-def compose(args) -> "object":
+def compose(args) -> object:
     """Build the bitmap for a print command, from an image, arguments or stdin."""
     if args.image:
         return render.load_image(args.image, args.dither)
@@ -55,12 +56,21 @@ def print_lines_for_server(lines) -> str:
 
 def add_print_options(parser):
     parser.add_argument("--size", type=int, default=36, help="font size (default 36)")
-    parser.add_argument("--columns", type=int, default=1, metavar="N",
-                        help="lay the text out in N columns; saves paper on long lists")
+    parser.add_argument(
+        "--columns",
+        type=int,
+        default=1,
+        metavar="N",
+        help="lay the text out in N columns; saves paper on long lists",
+    )
     parser.add_argument("--copies", type=int, default=1)
     parser.add_argument("--no-cut", action="store_true", help="leave the note uncut")
-    parser.add_argument("--transport", choices=["auto", "usb", "ble"], default="auto",
-                        help="auto tries USB first, then Bluetooth")
+    parser.add_argument(
+        "--transport",
+        choices=["auto", "usb", "ble"],
+        default="auto",
+        help="auto tries USB first, then Bluetooth",
+    )
     parser.add_argument("--ble-address", help="target a specific BLE device")
     parser.add_argument("--preview", metavar="PNG", help="render to a file instead of printing")
     parser.add_argument("-v", "--verbose", action="store_true")
@@ -68,35 +78,39 @@ def add_print_options(parser):
 
 def build_parser():
     parser = argparse.ArgumentParser(
-        prog="nemonic", description=__doc__,
-        formatter_class=argparse.RawDescriptionHelpFormatter)
+        prog="nemonic", description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter
+    )
     sub = parser.add_subparsers(dest="command", required=True)
 
     printer = sub.add_parser("print", help="print text, stdin or an image")
     printer.add_argument("text", nargs="*", default=[])
     printer.add_argument("--image", help="image file, scaled to 576px wide")
-    printer.add_argument("--dither", action="store_true",
-                         help="dither photographs; the default threshold suits text")
-    printer.add_argument("--self-test", action="store_true",
-                         help="the printer's built-in test page")
+    printer.add_argument(
+        "--dither", action="store_true", help="dither photographs; the default threshold suits text"
+    )
+    printer.add_argument(
+        "--self-test", action="store_true", help="the printer's built-in test page"
+    )
     add_print_options(printer)
 
     schedule = sub.add_parser("schedule", help="queue a print for the future")
-    schedule.add_argument("--at", required=True,
-                          help="'2026-09-15 07:30', '07:30', or '+90m'")
+    schedule.add_argument("--at", required=True, help="'2026-09-15 07:30', '07:30', or '+90m'")
     schedule.add_argument("--label", help="a note to yourself, shown in queue list")
-    schedule.add_argument("rest", nargs=argparse.REMAINDER,
-                          help="the nemonic command to run, after --")
+    schedule.add_argument(
+        "rest", nargs=argparse.REMAINDER, help="the nemonic command to run, after --"
+    )
 
     queue = sub.add_parser("queue", help="inspect or run the scheduled queue")
-    queue.add_argument("action", nargs="?", default="list",
-                       choices=["list", "run", "clear"])
+    queue.add_argument("action", nargs="?", default="list", choices=["list", "run", "clear"])
 
     serve = sub.add_parser("serve", help="HTTP print service for the local network")
     serve.add_argument("--host", default="0.0.0.0")
     serve.add_argument("--port", type=int, default=8719)
-    serve.add_argument("--token", default=os.environ.get("NEMONIC_TOKEN"),
-                       help="shared secret required in the X-Token header")
+    serve.add_argument(
+        "--token",
+        default=os.environ.get("NEMONIC_TOKEN"),
+        help="shared secret required in the X-Token header",
+    )
 
     sub.add_parser("status", help="report whether the printer is reachable")
     return parser
@@ -114,8 +128,9 @@ def main() -> int:
     elif args.command == "schedule":
         rest = [token for token in args.rest if token != "--"]
         if not rest:
-            raise SystemExit("nothing to schedule, e.g. "
-                             "nemonic schedule --at 07:30 -- print 'Bins out'")
+            raise SystemExit(
+                "nothing to schedule, e.g. nemonic schedule --at 07:30 -- print 'Bins out'"
+            )
         job = jobs.add(jobs.parse_when(args.at), rest, args.label)
         print(f"queued {job['id']} for {job['at']}: nemonic {' '.join(rest)}")
 
@@ -140,8 +155,10 @@ def main() -> int:
     elif args.command == "status":
         faults = core.usb_status()
         if faults is None:
-            print("printer not found on USB "
-                  "(is the cable a DATA cable, and the printer on?)", file=sys.stderr)
+            print(
+                "printer not found on USB (is the cable a DATA cable, and the printer on?)",
+                file=sys.stderr,
+            )
             return 1
         print("printer ready" if not faults else "printer reports: " + ", ".join(faults))
 

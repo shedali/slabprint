@@ -1,4 +1,5 @@
 """Turn text and images into 1-bit bitmaps the printer understands."""
+
 from __future__ import annotations
 
 import textwrap
@@ -8,9 +9,11 @@ from PIL import Image, ImageDraw, ImageFont
 from .core import MAX_HEIGHT_PX, WIDTH_PX
 
 # Fonts are looked up in order; the first that loads wins.
-BOLD_FONTS = ["/System/Library/Fonts/Supplemental/Arial Bold.ttf",
-              "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-              "/System/Library/Fonts/Helvetica.ttc"]
+BOLD_FONTS = [
+    "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/System/Library/Fonts/Helvetica.ttc",
+]
 
 # Roughly how wide an average glyph is relative to the font size. Used only to
 # choose wrap points; the exact value just trades ragged edges against overflow.
@@ -81,9 +84,16 @@ def _draw(draw, units, x: int, top: int, width_px: int, leading: int) -> int:
     return y
 
 
-def render_text(lines, size: int = 36, margin: int = 18, leading: int = 12,
-                columns: int = 1, gutter: int = 20,
-                width: int = WIDTH_PX, max_height: int = MAX_HEIGHT_PX) -> Image.Image:
+def render_text(
+    lines,
+    size: int = 36,
+    margin: int = 18,
+    leading: int = 12,
+    columns: int = 1,
+    gutter: int = 20,
+    width: int = WIDTH_PX,
+    max_height: int = MAX_HEIGHT_PX,
+) -> Image.Image:
     """Render lines to a bitmap.
 
     Two pieces of markup are supported, chosen because they survive being typed
@@ -131,8 +141,13 @@ def render_text(lines, size: int = 36, margin: int = 18, leading: int = 12,
     return canvas.crop((0, 0, width, min(max(bottom + margin, 40), max_height)))
 
 
-def load_image(path: str, dither: bool = False, width: int = WIDTH_PX,
-               max_height: int = MAX_HEIGHT_PX, mode: str = "1") -> Image.Image:
+def load_image(
+    path: str,
+    dither: bool = False,
+    width: int = WIDTH_PX,
+    max_height: int = MAX_HEIGHT_PX,
+    mode: str = "1",
+) -> Image.Image:
     """Load an image, flatten transparency, scale to `width`, reduce to `mode`.
 
     mode "1" is the printer's 1-bit format; pass "L" or "RGB" for displays that
