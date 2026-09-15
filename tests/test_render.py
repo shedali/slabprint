@@ -146,3 +146,34 @@ def test_cropping_long_content_warns_rather_than_losing_it_silently():
 def test_content_that_fits_does_not_warn(recwarn):
     render.render_text(["one line"], size=30)
     assert not [w for w in recwarn if "cropped" in str(w.message)]
+
+
+def test_a_box_draws_a_border_on_all_four_sides():
+    image = render.render_text(["framed"], size=30, box=True)
+    inset = 18 // 2  # margin // 2, where _draw_frame puts the line
+    mid_x, mid_y = image.width // 2, image.height // 2
+    assert image.getpixel((mid_x, inset)) == BLACK, "no top border"
+    assert image.getpixel((mid_x, image.height - inset - 1)) == BLACK, "no bottom border"
+    assert image.getpixel((inset, mid_y)) == BLACK, "no left border"
+    assert image.getpixel((image.width - inset - 1, mid_y)) == BLACK, "no right border"
+
+
+def test_no_box_means_no_border():
+    image = render.render_text(["plain"], size=30, box=False)
+    # Assert "not black" rather than a literal white value: PIL reports white as
+    # 1 for a freshly created mode "1" image but 255 for a converted one, and
+    # what matters here is only that nothing was drawn.
+    assert image.getpixel((image.width // 2, 18 // 2)) != BLACK
+
+
+def test_a_box_leaves_room_for_the_frame():
+    """Boxed content is padded inwards, so it is taller than the same text bare."""
+    assert (
+        render.render_text(["framed"], size=30, box=True).height
+        > render.render_text(["framed"], size=30, box=False).height
+    )
+
+
+def test_a_box_works_with_columns():
+    image = render.render_text([f"item {n}" for n in range(20)], size=24, columns=2, box=True)
+    assert image.getpixel((image.width // 2, 18 // 2)) == BLACK

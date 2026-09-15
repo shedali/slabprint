@@ -36,7 +36,7 @@ def compose(args) -> object:
     lines = args.text or sys.stdin.read().splitlines()
     if not any(line.strip() for line in lines):
         raise SystemExit("nothing to print")
-    return render.render_text(lines, size=args.size, columns=args.columns)
+    return render.render_text(lines, size=args.size, columns=args.columns, box=args.box)
 
 
 def emit(image, args) -> str:
@@ -58,6 +58,7 @@ def print_lines_for_server(lines) -> str:
 
 def add_print_options(parser):
     parser.add_argument("--size", type=int, default=36, help="font size (default 36)")
+    parser.add_argument("--box", action="store_true", help="draw a frame around the printed area")
     parser.add_argument(
         "--columns",
         type=int,

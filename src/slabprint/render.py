@@ -27,6 +27,11 @@ GLYPH_RATIO = 0.55
 # is a confusing way to learn you typed an extra zero.
 MAX_FONT_SIZE = 200
 
+# Frame geometry. The padding keeps text off the border; the line is thick enough
+# to survive a 203 DPI thermal head without looking like a hairline.
+BOX_PADDING = 14
+BOX_LINE_WIDTH = 3
+
 
 def check_size(size: int) -> None:
     if not 1 <= size <= MAX_FONT_SIZE:
@@ -56,6 +61,15 @@ def wrap(text: str, size: int, usable_px: int) -> list[str]:
     chunks = textwrap.wrap(text.strip(), width=columns) or [""]
     prefix = " " * indent
     return [prefix + chunks[0]] + [prefix + "  " + c for c in chunks[1:]]
+
+
+def _draw_frame(draw, width: int, height: int, margin: int) -> None:
+    """Frame the printed area. Inset by a little so the border is never clipped."""
+    draw.rectangle(
+        [(margin // 2, margin // 2), (width - margin // 2 - 1, height - margin // 2 - 1)],
+        outline=0,
+        width=BOX_LINE_WIDTH,
+    )
 
 
 def _warn_if_cropped(wanted: int, max_height: int) -> None:
@@ -117,6 +131,7 @@ def render_text(
     gutter: int = 20,
     width: int = WIDTH_PX,
     max_height: int = MAX_HEIGHT_PX,
+    box: bool = False,
 ) -> Image.Image:
     """Render lines to a bitmap.
 
@@ -127,17 +142,26 @@ def render_text(
 
     With columns > 1 the content is split across that many columns, balanced by
     drawn height, which suits long checklists and uses far less paper.
+
+    With box=True the content is framed. The frame is drawn last, once the height
+    is known, so it wraps the content rather than a fixed-size area.
     """
     check_size(size)
     columns = max(1, columns)
-    column_width = (width - 2 * margin - gutter * (columns - 1)) // columns
+    # The frame sits in the margin, so its content needs padding inside that.
+    inset = margin + BOX_PADDING if box else margin
+    column_width = (width - 2 * inset - gutter * (columns - 1)) // columns
     units = _flatten(lines, size, column_width)
 
     if columns == 1:
         canvas = Image.new("1", (width, max_height), 1)
-        height = _draw(ImageDraw.Draw(canvas), units, margin, margin, column_width, leading)
-        _warn_if_cropped(height + margin, max_height)
-        return canvas.crop((0, 0, width, min(max(height + margin, 40), max_height)))
+        draw = ImageDraw.Draw(canvas)
+        height = _draw(draw, units, inset, inset, column_width, leading)
+        bottom = min(max(height + inset, 40), max_height)
+        _warn_if_cropped(height + inset, max_height)
+        if box:
+            _draw_frame(draw, width, bottom, margin)
+        return canvas.crop((0, 0, width, bottom))
 
     # Balance by cumulative drawn height rather than unit count, so a heading or
     # a rule does not push one column noticeably longer than the others.
@@ -159,13 +183,16 @@ def render_text(
 
     canvas = Image.new("1", (width, max_height), 1)
     draw = ImageDraw.Draw(canvas)
-    bottom = margin
+    bottom = inset
     for index, chunk in enumerate(chunks):
-        x = margin + index * (column_width + gutter)
-        bottom = max(bottom, _draw(draw, chunk, x, margin, column_width, leading))
+        x = inset + index * (column_width + gutter)
+        bottom = max(bottom, _draw(draw, chunk, x, inset, column_width, leading))
 
-    _warn_if_cropped(bottom + margin, max_height)
-    return canvas.crop((0, 0, width, min(max(bottom + margin, 40), max_height)))
+    _warn_if_cropped(bottom + inset, max_height)
+    edge = min(max(bottom + inset, 40), max_height)
+    if box:
+        _draw_frame(draw, width, edge, margin)
+    return canvas.crop((0, 0, width, edge))
 
 
 def load_image(
