@@ -47,6 +47,11 @@ unusual, point `SLABPRINT_LIBUSB` at the library file.
 
 On Linux you may need a udev rule, or root, to claim the USB interface.
 
+**Optional companions.** Printing an image straight off the clipboard needs a tool
+that can emit one, since `pbpaste` only ever produces text: `pngpaste` on macOS,
+`wl-paste` or `xclip` on Linux. These are not dependencies — `slabprint` just
+reads the image on stdin.
+
 ## Use
 
 `print` is the default command, so it can be left out:
@@ -126,6 +131,18 @@ It prints the **first page only** unless told otherwise, because a long document
 would otherwise quietly become a great many sticky notes. Each page is a separate
 job, so the printer cuts between them and they arrive as separate notes.
 
+Anything wider than the paper is scaled to fit; width never crops. A page *taller*
+than the printer's 2176 px limit is a real choice, so `--overflow` makes it one:
+
+| Mode | What happens | Loses anything? |
+|---|---|---|
+| `scale` (default) | the whole page shrinks onto one note | no |
+| `split` | the page continues onto further notes | no |
+| `crop` | the top is kept, the rest discarded | yes, and it warns |
+
+Ordinary pages never reach this: A4 at full width is about 815 px. It matters for
+long receipts and unusually tall pages.
+
 Needs `pypdfium2`, which the flake includes. With a pip install, ask for it:
 `pipx install 'slabprint[pdf]'`.
 
@@ -160,6 +177,10 @@ slabprint telegram
 
 Now send the bot text, a photo or a PDF and it prints. `/status` reports whether
 the printer is ready.
+
+PDFs print their first page, scaled to fit. Downloads are retried if the network
+drops mid-transfer, and anything that fails replies in the chat rather than
+leaving you waiting for a note that never arrives.
 
 **The allowlist is mandatory and has no wildcard**, and the bridge refuses to
 start without one. A bot's username is public and anyone can message it, so an
