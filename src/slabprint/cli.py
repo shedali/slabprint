@@ -191,7 +191,17 @@ def build_parser():
     return parser
 
 
-SUBCOMMANDS = frozenset({"print", "schedule", "queue", "serve", "status"})
+def subcommands() -> frozenset[str]:
+    """The registered subcommand names, read from the parser itself.
+
+    Derived rather than listed: a hardcoded copy silently rots the moment a
+    command is added, and the symptom is the new command being printed as text
+    instead of running.
+    """
+    for action in build_parser()._subparsers._group_actions:
+        if action.choices:
+            return frozenset(action.choices)
+    return frozenset()
 
 
 def with_default_command(argv: list[str]) -> list[str]:
@@ -205,7 +215,7 @@ def with_default_command(argv: list[str]) -> list[str]:
     the printer rather than printing the word. Print that word with
     `slabprint print status`.
     """
-    if argv and argv[0] in SUBCOMMANDS:
+    if argv and argv[0] in subcommands():
         return argv
     if argv and argv[0] in ("-h", "--help"):
         return argv

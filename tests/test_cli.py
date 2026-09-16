@@ -76,7 +76,7 @@ def test_a_leading_flag_defaults_to_printing():
     assert cli.with_default_command(["--image", "x.png"]) == ["print", "--image", "x.png"]
 
 
-@pytest.mark.parametrize("command", sorted(cli.SUBCOMMANDS))
+@pytest.mark.parametrize("command", sorted(cli.subcommands()))
 def test_a_real_subcommand_is_left_alone(command):
     assert cli.with_default_command([command, "x"]) == [command, "x"]
 
@@ -93,3 +93,11 @@ def test_no_arguments_with_a_pipe_means_print_from_stdin(monkeypatch):
 def test_no_arguments_on_a_terminal_shows_help(monkeypatch):
     monkeypatch.setattr(cli.sys.stdin, "isatty", lambda: True)
     assert cli.with_default_command([]) == []
+
+
+def test_every_registered_subcommand_is_recognised():
+    """Guards the shim against drifting when a command is added."""
+    registered = cli.subcommands()
+    assert {"print", "schedule", "queue", "serve", "status", "telegram"} <= registered
+    for command in registered:
+        assert cli.with_default_command([command]) == [command]
