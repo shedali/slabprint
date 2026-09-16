@@ -260,10 +260,19 @@ def load_pdf(source, pages: str = "1", dither: bool = False, **kwargs) -> list[I
         for index in wanted:
             page = document[index]
             bitmap = page.render(scale=PDF_RENDER_SCALE, grayscale=True)
-            rendered.append(_fit(bitmap.to_pil(), dither=dither, **kwargs))
+            rendered.extend(_fit(bitmap.to_pil(), dither=dither, **kwargs))
         return rendered
     finally:
         document.close()
+
+
+OVERFLOW_MODES = ("scale", "split", "crop")
+
+
+def _reduce(image: Image.Image, dither: bool, mode: str) -> Image.Image:
+    if mode != "1":
+        return image.convert(mode)
+    return image.convert("1", dither=Image.FLOYDSTEINBERG if dither else Image.NONE)
 
 
 def _fit(
@@ -272,18 +281,46 @@ def _fit(
     width: int = WIDTH_PX,
     max_height: int = MAX_HEIGHT_PX,
     mode: str = "1",
-) -> Image.Image:
-    """Scale to the paper width and reduce, shared by the image and PDF paths."""
+    overflow: str = "scale",
+) -> list[Image.Image]:
+    """Scale to the paper width, then deal with anything still too tall.
+
+    The paper is a fixed width but an unbounded roll, so width always scales and
+    only height can overflow. What to do then is a real choice:
+
+      scale  shrink the whole page to fit one note. Loses nothing (default).
+      split  continue onto further notes. Loses nothing, costs paper.
+      crop   keep the top and discard the rest. Loses content.
+
+    Returns a list because "split" can produce more than one note.
+    """
+    if overflow not in OVERFLOW_MODES:
+        raise ValueError(f"overflow must be one of {', '.join(OVERFLOW_MODES)}, got {overflow!r}")
+
     image = image.convert("L")
     if image.width != width:
         height = max(1, round(image.height * width / image.width))
         image = image.resize((width, height), Image.LANCZOS)
-    if image.height > max_height:
+
+    if image.height <= max_height:
+        return [_reduce(image, dither, mode)]
+
+    if overflow == "crop":
         _warn_if_cropped(image.height, max_height)
-        image = image.crop((0, 0, width, max_height))
-    if mode != "1":
-        return image.convert(mode)
-    return image.convert("1", dither=Image.FLOYDSTEINBERG if dither else Image.NONE)
+        return [_reduce(image.crop((0, 0, width, max_height)), dither, mode)]
+
+    if overflow == "scale":
+        scaled_width = max(1, round(width * max_height / image.height))
+        image = image.resize((scaled_width, max_height), Image.LANCZOS)
+        # Keep the full paper width so the page is not stretched sideways.
+        canvas = Image.new("L", (width, max_height), 255)
+        canvas.paste(image, ((width - scaled_width) // 2, 0))
+        return [_reduce(canvas, dither, mode)]
+
+    return [
+        _reduce(image.crop((0, top, width, min(top + max_height, image.height))), dither, mode)
+        for top in range(0, image.height, max_height)
+    ]
 
 
 def load_image(
@@ -292,7 +329,8 @@ def load_image(
     width: int = WIDTH_PX,
     max_height: int = MAX_HEIGHT_PX,
     mode: str = "1",
-) -> Image.Image:
+    overflow: str = "scale",
+) -> list[Image.Image]:
     """Load an image, flatten transparency, scale to `width`, reduce to `mode`.
 
     `source` is a path, or "-" to read the image from standard input, which is
@@ -313,17 +351,14 @@ def load_image(
         image = image.convert("RGBA")
         flattened.paste(image, mask=image.split()[-1])
         image = flattened
-    image = image.convert("L")
-
-    if image.width != width:
-        height = max(1, round(image.height * width / image.width))
-        image = image.resize((width, height), Image.LANCZOS)
-    if image.height > max_height:
-        image = image.crop((0, 0, width, max_height))
-
-    if mode != "1":
-        return image.convert(mode)
-    return image.convert("1", dither=Image.FLOYDSTEINBERG if dither else Image.NONE)
+    return _fit(
+        image,
+        dither=dither,
+        width=width,
+        max_height=max_height,
+        mode=mode,
+        overflow=overflow,
+    )
 
 
 def pack(image: Image.Image) -> tuple[bytes, int, int]:

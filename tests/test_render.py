@@ -115,7 +115,7 @@ def test_a_heading_is_taller_than_plain_text():
 def test_load_image_scales_to_the_target_width(tmp_path):
     source = tmp_path / "wide.png"
     Image.new("RGB", (1000, 500), "white").save(source)
-    loaded = render.load_image(str(source), width=576)
+    loaded = render.load_image(str(source), width=576)[0]
     assert loaded.width == 576
     assert loaded.height == 288  # aspect ratio preserved
 
@@ -123,13 +123,13 @@ def test_load_image_scales_to_the_target_width(tmp_path):
 def test_load_image_crops_something_far_too_tall(tmp_path):
     source = tmp_path / "tall.png"
     Image.new("RGB", (100, 40_000), "white").save(source)
-    assert render.load_image(str(source)).height == render.MAX_HEIGHT_PX
+    assert render.load_image(str(source), overflow="crop")[0].height == render.MAX_HEIGHT_PX
 
 
 def test_load_image_flattens_transparency_instead_of_blackening_it(tmp_path):
     source = tmp_path / "clear.png"
     Image.new("RGBA", (64, 64), (0, 0, 0, 0)).save(source)
-    loaded = render.load_image(str(source))
+    loaded = render.load_image(str(source))[0]
     # A fully transparent image should come out white, not solid black.
     assert loaded.getpixel((0, 0)) == WHITE
 
@@ -189,7 +189,7 @@ def test_an_image_can_be_read_from_stdin(tmp_path, monkeypatch):
         buffer = io.BytesIO(source.read_bytes())
 
     monkeypatch.setattr(render.sys, "stdin", FakeStdin)
-    assert render.load_image("-").width == render.WIDTH_PX
+    assert render.load_image("-")[0].width == render.WIDTH_PX
 
 
 def test_empty_stdin_is_a_clean_error(monkeypatch):
@@ -254,3 +254,42 @@ def test_page_specs_parse(spec, total, expected):
 def test_nonsense_page_specs_are_refused(spec):
     with pytest.raises(ValueError):
         render.parse_pages(spec, 5)
+
+
+def tall_image(tmp_path, ratio=12):
+    source = tmp_path / "tall.png"
+    image = Image.new("RGB", (400, 400 * ratio), "white")
+    ImageDraw.Draw(image).text((20, 400 * ratio - 60), "BOTTOM", fill="black")
+    image.save(source)
+    return str(source)
+
+
+def test_scale_keeps_an_over_tall_page_in_one_note(tmp_path):
+    pages = render.load_image(tall_image(tmp_path), overflow="scale")
+    assert len(pages) == 1
+    assert pages[0].height <= render.MAX_HEIGHT_PX
+
+
+def test_split_continues_onto_further_notes(tmp_path):
+    pages = render.load_image(tall_image(tmp_path), overflow="split")
+    assert len(pages) > 1
+    assert all(page.height <= render.MAX_HEIGHT_PX for page in pages)
+
+
+def test_crop_keeps_only_the_first_note(tmp_path):
+    with pytest.warns(UserWarning):
+        pages = render.load_image(tall_image(tmp_path), overflow="crop")
+    assert len(pages) == 1
+
+
+def test_an_unknown_overflow_mode_is_refused(tmp_path):
+    with pytest.raises(ValueError, match="overflow"):
+        render.load_image(tall_image(tmp_path), overflow="shred")
+
+
+def test_a_page_that_already_fits_is_untouched_by_every_mode(tmp_path):
+    source = tmp_path / "fits.png"
+    Image.new("RGB", (600, 400), "white").save(source)
+    for mode in render.OVERFLOW_MODES:
+        pages = render.load_image(str(source), overflow=mode)
+        assert len(pages) == 1

@@ -28,6 +28,7 @@ API = "https://api.telegram.org"
 POLL_SECONDS = 50  # Telegram holds the request open; this is not a busy loop
 MAX_CHARS = 2000  # more than the paper holds; refuse rather than crop silently
 MAX_DOCUMENT_BYTES = 20 * 1024 * 1024  # the bot API's own download ceiling
+DOWNLOAD_ATTEMPTS = 3  # a reset mid-transfer should not cost someone their print
 
 
 class Bridge:
@@ -54,10 +55,26 @@ class Bridge:
             print(f"reply failed: {exc}", file=sys.stderr)
 
     def download(self, file_id: str) -> bytes:
+        """Fetch a file, retrying transient network failures.
+
+        Telegram resets connections often enough that a single attempt loses
+        prints on a flaky link, and the update has already been consumed by
+        then, so there is nothing left to retry at the queue level.
+        """
         info = self.api("getFile", {"file_id": file_id}, timeout=60)["result"]
         url = f"{API}/file/bot{self.token}/{info['file_path']}"
-        with urllib.request.urlopen(url, timeout=120) as response:
-            return response.read()
+        last = None
+        for attempt in range(1, DOWNLOAD_ATTEMPTS + 1):
+            try:
+                with urllib.request.urlopen(url, timeout=120) as response:
+                    return response.read()
+            except (urllib.error.URLError, OSError, TimeoutError) as exc:
+                last = exc
+                print(f"download attempt {attempt} failed: {exc}", file=sys.stderr)
+                time.sleep(2 * attempt)
+        raise RuntimeError(
+            f"could not download the file after {DOWNLOAD_ATTEMPTS} attempts: {last}"
+        )
 
     # ---- message handling --------------------------------------------------
 
@@ -178,6 +195,11 @@ class Bridge:
                     self.handle(message)
                 except Exception as exc:  # one bad message must not stop the bridge
                     print(f"handling failed: {type(exc).__name__}: {exc}", file=sys.stderr)
+                    # Say so. The update is already consumed, so silence would
+                    # leave the sender waiting for a note that will never come.
+                    chat = (message.get("chat") or {}).get("id")
+                    if chat in self.allowed:
+                        self.say(chat, f"sorry — that failed: {type(exc).__name__}: {exc}")
 
 
 def resolve_token() -> str:

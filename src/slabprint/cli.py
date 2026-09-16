@@ -45,8 +45,10 @@ def compose(args) -> list:
                 raise ValueError("no data on standard input")
             source = io.BytesIO(data)
         if render.is_pdf(source):
-            return render.load_pdf(source, pages=args.pages, dither=args.dither)
-        return [render.load_image(source, args.dither)]
+            return render.load_pdf(
+                source, pages=args.pages, dither=args.dither, overflow=args.overflow
+            )
+        return render.load_image(source, args.dither, overflow=args.overflow)
     lines = args.text or sys.stdin.read().splitlines()
     if not any(line.strip() for line in lines):
         raise SystemExit("nothing to print")
@@ -94,7 +96,7 @@ def print_for_bot(kind: str, payload) -> str:
         if kind == "pdf":
             images = render.load_pdf(io.BytesIO(payload), pages="1", dither=True)
         else:
-            images = [render.load_image(io.BytesIO(payload), dither=True)]
+            images = render.load_image(io.BytesIO(payload), dither=True)
         for image in images:
             bitmap, width_bytes, height = render.pack(image)
             core.send(core.build_job(bitmap, width_bytes, height))
@@ -143,6 +145,13 @@ def build_parser():
         "--image",
         metavar="FILE",
         help='image or PDF file, or "-" to read one from stdin',
+    )
+    printer.add_argument(
+        "--overflow",
+        choices=render.OVERFLOW_MODES,
+        default="scale",
+        help="what to do when a page is taller than the printer allows: "
+        "scale it down (default), split it across notes, or crop it",
     )
     printer.add_argument(
         "--pages",
