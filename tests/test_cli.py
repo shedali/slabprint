@@ -101,3 +101,27 @@ def test_every_registered_subcommand_is_recognised():
     assert {"print", "schedule", "queue", "serve", "status", "telegram"} <= registered
     for command in registered:
         assert cli.with_default_command([command]) == [command]
+
+
+class FakeResult:
+    def __init__(self, stdout=b"", returncode=0, stderr=b""):
+        self.stdout, self.returncode, self.stderr = stdout, returncode, stderr
+
+
+def test_the_clipboard_reader_uses_the_first_tool_installed(monkeypatch):
+    monkeypatch.setattr(cli.shutil, "which", lambda name: name == "wl-paste")
+    monkeypatch.setattr(cli.subprocess, "run", lambda *a, **k: FakeResult(b"PNGDATA"))
+    assert cli.read_clipboard_image() == b"PNGDATA"
+
+
+def test_no_clipboard_tool_explains_what_to_install(monkeypatch):
+    monkeypatch.setattr(cli.shutil, "which", lambda name: None)
+    with pytest.raises(ValueError, match="pngpaste"):
+        cli.read_clipboard_image()
+
+
+def test_an_empty_clipboard_is_a_clean_error(monkeypatch):
+    monkeypatch.setattr(cli.shutil, "which", lambda name: name == "pngpaste")
+    monkeypatch.setattr(cli.subprocess, "run", lambda *a, **k: FakeResult(b"", 1, b"no image data"))
+    with pytest.raises(ValueError, match="no image"):
+        cli.read_clipboard_image()

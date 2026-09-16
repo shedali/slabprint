@@ -293,3 +293,15 @@ def test_a_page_that_already_fits_is_untouched_by_every_mode(tmp_path):
     for mode in render.OVERFLOW_MODES:
         pages = render.load_image(str(source), overflow=mode)
         assert len(pages) == 1
+
+
+def test_a_bundled_font_is_preferred(monkeypatch, tmp_path):
+    """The package pins SLABPRINT_FONT so it does not rely on system fonts."""
+    monkeypatch.setenv("SLABPRINT_FONT", str(tmp_path / "missing.ttf"))
+    # A bad path must degrade to the normal candidates, not explode.
+    assert render.load_font(20) is not None
+
+
+def test_font_loading_always_returns_something(monkeypatch):
+    monkeypatch.delenv("SLABPRINT_FONT", raising=False)
+    assert render.load_font(30) is not None

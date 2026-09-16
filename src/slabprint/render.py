@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import io
+import os
 import sys
 import textwrap
 import warnings
@@ -14,7 +15,10 @@ from PIL import Image, ImageDraw, ImageFont
 
 from .core import MAX_HEIGHT_PX, WIDTH_PX
 
-# Fonts are looked up in order; the first that loads wins.
+# Fonts are looked up in order; the first that loads wins. SLABPRINT_FONT comes
+# first so a package can ship its own: without it, a build on a machine without
+# these system fonts falls back to PIL's bitmap default and prints badly, which
+# is a poor surprise for something installed from a package manager.
 BOLD_FONTS = [
     "/System/Library/Fonts/Supplemental/Arial Bold.ttf",
     "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
@@ -42,7 +46,10 @@ def check_size(size: int) -> None:
 
 
 def load_font(size: int):
-    for path in BOLD_FONTS:
+    candidates = BOLD_FONTS
+    if bundled := os.environ.get("SLABPRINT_FONT"):
+        candidates = [bundled, *BOLD_FONTS]
+    for path in candidates:
         try:
             return ImageFont.truetype(path, size)
         except Exception:

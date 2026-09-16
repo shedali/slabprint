@@ -47,10 +47,16 @@ unusual, point `SLABPRINT_LIBUSB` at the library file.
 
 On Linux you may need a udev rule, or root, to claim the USB interface.
 
-**Optional companions.** Printing an image straight off the clipboard needs a tool
-that can emit one, since `pbpaste` only ever produces text: `pngpaste` on macOS,
-`wl-paste` or `xclip` on Linux. These are not dependencies — `slabprint` just
-reads the image on stdin.
+**Self-contained by design.** The flake pins everything reached for at runtime:
+libusb, a font, and the clipboard readers. Nothing depends on what happens to be
+installed on the machine. Installed another way, the same things are found on the
+system if present, and `SLABPRINT_LIBUSB` and `SLABPRINT_FONT` override either.
+
+The font matters more than it sounds: without one, text falls back to Pillow's
+bitmap default and prints badly.
+
+`--clipboard` shells out to `pngpaste` (macOS), `wl-paste` (Wayland) or `xclip`
+(X11) — whichever is present. `pbpaste` cannot help, as it only ever emits text.
 
 ## Use
 
@@ -64,7 +70,7 @@ slabprint print "# Shopping" "milk" "bread"       # "# " makes a heading
 cat notes.txt | slabprint print --size 30         # from stdin
 slabprint print --image photo.jpg --dither        # a picture
 pbpaste | slabprint print --size 30              # whatever is on the clipboard
-pngpaste - | slabprint print --image - --dither  # a clipboard IMAGE (macOS)
+slabprint print --clipboard --dither             # a clipboard IMAGE
 slabprint print --self-test                       # the printer's own test page
 slabprint print --image invoice.pdf               # first page of a PDF
 slabprint print --image doc.pdf --pages all       # every page, one note each

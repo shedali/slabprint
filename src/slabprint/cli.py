@@ -19,6 +19,7 @@ import argparse
 import io
 import os
 import shutil
+import subprocess
 import sys
 
 from . import core, jobs, render, server, telegram
@@ -30,6 +31,35 @@ def entry_command() -> list[str]:
     return [installed] if installed else [sys.executable, "-m", "slabprint"]
 
 
+# Tools that can put a clipboard IMAGE on stdout. pbpaste cannot: it only ever
+# emits text, which is why printing a copied screenshot needs one of these.
+CLIPBOARD_READERS = (
+    ["pngpaste", "-"],  # macOS
+    ["wl-paste", "--type", "image/png"],  # Wayland
+    ["xclip", "-selection", "clipboard", "-t", "image/png", "-o"],  # X11
+)
+
+
+def read_clipboard_image() -> bytes:
+    """Return the clipboard's image bytes, using whichever tool is installed."""
+    tried = []
+    for command in CLIPBOARD_READERS:
+        if not shutil.which(command[0]):
+            tried.append(command[0])
+            continue
+        result = subprocess.run(command, capture_output=True, timeout=60)
+        if result.returncode == 0 and result.stdout:
+            return result.stdout
+        raise ValueError(
+            f"{command[0]} found no image on the clipboard"
+            + (f": {result.stderr.decode(errors='replace').strip()}" if result.stderr else "")
+        )
+    raise ValueError(
+        "no clipboard image tool found — install pngpaste (macOS), wl-paste or "
+        f"xclip (Linux). Looked for: {', '.join(tried)}"
+    )
+
+
 def compose(args) -> list:
     """Build the bitmaps to print, from a PDF, an image, arguments or stdin.
 
@@ -37,6 +67,10 @@ def compose(args) -> list:
     separate job: the printer cuts between them, so they arrive as separate
     notes rather than one long strip.
     """
+    if args.clipboard:
+        return render.load_image(
+            io.BytesIO(read_clipboard_image()), dither=args.dither, overflow=args.overflow
+        )
     if args.image:
         source = args.image
         if source == "-":
@@ -145,6 +179,11 @@ def build_parser():
         "--image",
         metavar="FILE",
         help='image or PDF file, or "-" to read one from stdin',
+    )
+    printer.add_argument(
+        "--clipboard",
+        action="store_true",
+        help="print the image on the clipboard (needs pngpaste, wl-paste or xclip)",
     )
     printer.add_argument(
         "--overflow",
