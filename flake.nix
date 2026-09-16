@@ -19,7 +19,7 @@
 
           build-system = [ pkgs.python3Packages.hatchling ];
 
-          dependencies = with pkgs.python3Packages; [ pillow pyusb bleak ];
+          dependencies = with pkgs.python3Packages; [ pillow pyusb bleak pypdfium2 ];
 
           # pyusb loads libusb through ctypes at runtime, so it has to be told
           # where the library actually is inside the store.
@@ -55,7 +55,7 @@
       devShells = forAllSystems (pkgs: {
         default = pkgs.mkShell {
           packages = [
-            (pkgs.python3.withPackages (ps: with ps; [ pillow pyusb bleak hatchling ]))
+            (pkgs.python3.withPackages (ps: with ps; [ pillow pyusb bleak pypdfium2 hatchling ]))
             pkgs.libusb1
           ];
           env.NEMONIC_LIBUSB =

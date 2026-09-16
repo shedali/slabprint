@@ -1,6 +1,6 @@
 # SPDX-License-Identifier: MIT
 # Copyright (c) 2026 Franz Sittampalam
-"""nemonic — print to a MangoSlab nemonic MIP-001 sticky-note printer.
+"""slabprint — print to a MangoSlab nemonic MIP-001 sticky-note printer.
 
   slabprint print "Buy milk"                  print a line of text
   cat notes.md | slabprint print --size 30    print from stdin
@@ -16,11 +16,12 @@ Add --preview out.png to any print to render without using paper.
 from __future__ import annotations
 
 import argparse
+import io
 import os
 import shutil
 import sys
 
-from . import core, jobs, render, server
+from . import core, jobs, render, server, telegram
 
 
 def entry_command() -> list[str]:
@@ -29,26 +30,77 @@ def entry_command() -> list[str]:
     return [installed] if installed else [sys.executable, "-m", "slabprint"]
 
 
-def compose(args) -> object:
-    """Build the bitmap for a print command, from an image, arguments or stdin."""
+def compose(args) -> list:
+    """Build the bitmaps to print, from a PDF, an image, arguments or stdin.
+
+    Returns a list because a PDF can contribute several pages, and each is a
+    separate job: the printer cuts between them, so they arrive as separate
+    notes rather than one long strip.
+    """
     if args.image:
-        return render.load_image(args.image, args.dither)
+        source = args.image
+        if source == "-":
+            data = sys.stdin.buffer.read()
+            if not data:
+                raise ValueError("no data on standard input")
+            source = io.BytesIO(data)
+        if render.is_pdf(source):
+            return render.load_pdf(source, pages=args.pages, dither=args.dither)
+        return [render.load_image(source, args.dither)]
     lines = args.text or sys.stdin.read().splitlines()
     if not any(line.strip() for line in lines):
         raise SystemExit("nothing to print")
-    return render.render_text(lines, size=args.size, columns=args.columns, box=args.box)
+    return [render.render_text(lines, size=args.size, columns=args.columns, box=args.box)]
 
 
-def emit(image, args) -> str:
-    """Preview to a file, or pack and send to the printer."""
+def emit(images, args) -> str:
+    """Preview to a file, or pack and send each page to the printer."""
     if args.preview:
-        image.save(args.preview)
-        return f"preview written to {args.preview} ({image.width}x{image.height})"
-    bitmap, width_bytes, height = render.pack(image)
-    job = core.build_job(bitmap, width_bytes, height, args.copies, cut=not args.no_cut)
-    if args.verbose:
-        print(f"raster {width_bytes * 8}x{height}, job {len(job)} bytes")
-    return core.send(job, args.transport, args.ble_address)
+        # Several pages would overwrite each other, so number all but the first.
+        results = []
+        for number, image in enumerate(images, start=1):
+            target = args.preview
+            if number > 1:
+                stem, _, extension = args.preview.rpartition(".")
+                target = f"{stem}-{number}.{extension}" if stem else f"{args.preview}-{number}"
+            image.save(target)
+            results.append(f"{target} ({image.width}x{image.height})")
+        return "preview written to " + ", ".join(results)
+
+    sent = []
+    for image in images:
+        bitmap, width_bytes, height = render.pack(image)
+        job = core.build_job(bitmap, width_bytes, height, args.copies, cut=not args.no_cut)
+        if args.verbose:
+            print(f"raster {width_bytes * 8}x{height}, job {len(job)} bytes")
+        sent.append(core.send(job, args.transport, args.ble_address))
+    return "; ".join(sent)
+
+
+def print_for_bot(kind: str, payload) -> str:
+    """Print on behalf of the Telegram bridge, reporting failures as text.
+
+    The bridge must never crash on a bad message, so everything here is turned
+    into a sentence the sender can read.
+    """
+    try:
+        if kind == "status":
+            faults = core.usb_status()
+            if faults is None:
+                return "printer not reachable — check it is on, or power-cycle it"
+            return "printer ready" if not faults else "printer reports: " + ", ".join(faults)
+        if kind == "text":
+            return print_lines_for_server(str(payload).splitlines())
+        if kind == "pdf":
+            images = render.load_pdf(io.BytesIO(payload), pages="1", dither=True)
+        else:
+            images = [render.load_image(io.BytesIO(payload), dither=True)]
+        for image in images:
+            bitmap, width_bytes, height = render.pack(image)
+            core.send(core.build_job(bitmap, width_bytes, height))
+        return "printed"
+    except Exception as exc:
+        return f"could not print: {type(exc).__name__}: {exc}"
 
 
 def print_lines_for_server(lines) -> str:
@@ -88,7 +140,15 @@ def build_parser():
     printer = sub.add_parser("print", help="print text, stdin or an image")
     printer.add_argument("text", nargs="*", default=[])
     printer.add_argument(
-        "--image", metavar="FILE", help='image file, or "-" to read one from stdin'
+        "--image",
+        metavar="FILE",
+        help='image or PDF file, or "-" to read one from stdin',
+    )
+    printer.add_argument(
+        "--pages",
+        default="1",
+        metavar="SPEC",
+        help='PDF pages to print: "1", "2-5" or "all" (default: the first page)',
     )
     printer.add_argument(
         "--dither", action="store_true", help="dither photographs; the default threshold suits text"
@@ -118,6 +178,13 @@ def build_parser():
         default=os.environ.get("SLABPRINT_TOKEN"),
         help="shared secret required in the X-Token header; prefer the "
         "SLABPRINT_TOKEN environment variable, since a flag is visible in ps",
+    )
+
+    bot = sub.add_parser("telegram", help="print what is sent to a Telegram bot")
+    bot.add_argument(
+        "--whoami",
+        action="store_true",
+        help="list chat ids that have messaged the bot, to seed the allowlist",
     )
 
     sub.add_parser("status", help="report whether the printer is reachable")
@@ -184,6 +251,18 @@ def main() -> int:
             print(f"ran {len(finished)} due job(s)")
         else:
             print(f"cleared {jobs.clear()} job(s)")
+
+    elif args.command == "telegram":
+        token = telegram.resolve_token()
+        if args.whoami:
+            return telegram.whoami(token)
+        bridge = telegram.Bridge(
+            token=token,
+            allowed=telegram.resolve_allowlist(),
+            printer=print_for_bot,
+            state_dir=jobs.STATE_DIR,
+        )
+        return bridge.run()
 
     elif args.command == "serve":
         server.serve(print_lines_for_server, args.host, args.port, args.token)

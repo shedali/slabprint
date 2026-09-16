@@ -8,6 +8,7 @@ import io
 import sys
 import textwrap
 import warnings
+from pathlib import Path
 
 from PIL import Image, ImageDraw, ImageFont
 
@@ -195,6 +196,94 @@ def render_text(
     if box:
         _draw_frame(draw, width, edge, margin)
     return canvas.crop((0, 0, width, edge))
+
+
+PDF_MAGIC = b"%PDF"
+# Rendering DPI for PDF pages. The printer is 203 DPI; rasterising a little
+# above that and letting the downscale to 576px do the antialiasing gives
+# noticeably cleaner text than rendering at the target size directly.
+PDF_RENDER_SCALE = 3.0
+
+
+def is_pdf(source) -> bool:
+    """Sniff for a PDF, by content rather than by file extension."""
+    if hasattr(source, "read"):
+        position = source.tell()
+        head = source.read(len(PDF_MAGIC))
+        source.seek(position)
+        return head == PDF_MAGIC
+    try:
+        with Path(source).open("rb") as handle:
+            return handle.read(len(PDF_MAGIC)) == PDF_MAGIC
+    except OSError:
+        return False
+
+
+def parse_pages(spec: str, total: int) -> list[int]:
+    """Parse "1", "2-5" or "all" into zero-based page indices."""
+    spec = (spec or "1").strip().lower()
+    if spec == "all":
+        return list(range(total))
+    if "-" in spec:
+        first, _, last = spec.partition("-")
+        start, end = int(first), int(last)
+    else:
+        start = end = int(spec)
+    if start < 1 or end < start:
+        raise ValueError(f"cannot parse pages {spec!r}: try '1', '2-5' or 'all'")
+    return list(range(start - 1, min(end, total)))
+
+
+def load_pdf(source, pages: str = "1", dither: bool = False, **kwargs) -> list[Image.Image]:
+    """Rasterise selected PDF pages, one printable bitmap each.
+
+    Defaults to the first page only: a long document would otherwise quietly
+    turn into a great many sticky notes.
+    """
+    try:
+        import pypdfium2
+    except ImportError as exc:  # pragma: no cover - depends on the install
+        raise ValueError("printing a PDF needs pypdfium2 (pip install 'slabprint[pdf]')") from exc
+
+    if source == "-":
+        data = sys.stdin.buffer.read()
+        if not data:
+            raise ValueError("no PDF data on standard input")
+        source = io.BytesIO(data)
+
+    document = pypdfium2.PdfDocument(source)
+    try:
+        wanted = parse_pages(pages, len(document))
+        if not wanted:
+            raise ValueError(f"no such page in a {len(document)}-page document")
+        rendered = []
+        for index in wanted:
+            page = document[index]
+            bitmap = page.render(scale=PDF_RENDER_SCALE, grayscale=True)
+            rendered.append(_fit(bitmap.to_pil(), dither=dither, **kwargs))
+        return rendered
+    finally:
+        document.close()
+
+
+def _fit(
+    image: Image.Image,
+    dither: bool,
+    width: int = WIDTH_PX,
+    max_height: int = MAX_HEIGHT_PX,
+    mode: str = "1",
+) -> Image.Image:
+    """Scale to the paper width and reduce, shared by the image and PDF paths."""
+    image = image.convert("L")
+    if image.width != width:
+        height = max(1, round(image.height * width / image.width))
+        image = image.resize((width, height), Image.LANCZOS)
+    if image.height > max_height:
+        _warn_if_cropped(image.height, max_height)
+        image = image.crop((0, 0, width, max_height))
+    if mode != "1":
+        return image.convert(mode)
+    return image.convert("1", dither=Image.FLOYDSTEINBERG if dither else Image.NONE)
 
 
 def load_image(

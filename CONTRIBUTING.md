@@ -34,7 +34,8 @@ what a device did in response to what — not as someone else's material.
 The same three checks run in CI, and the nix build runs the test suite in its
 sandbox. All of them are hard failures.
 
-Tests must not require a printer. The USB and Bluetooth transports are
+Tests must not require a printer. They do need pypdfium2, for the PDF path.
+ The USB and Bluetooth transports are
 deliberately untested rather than mocked, because a mock of a printer only
 proves the mock works — the interesting failures there are physical.
 

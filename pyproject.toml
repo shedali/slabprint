@@ -31,7 +31,8 @@ dependencies = [
 slabprint = "slabprint.cli:run"
 
 [project.optional-dependencies]
-dev = ["pytest>=8", "ruff==0.16.7"]
+dev = ["pytest>=8", "ruff==0.16.7", "pypdfium2>=4"]
+pdf = ["pypdfium2>=4"]
 
 [project.urls]
 Homepage = "https://github.com/shedali/slabprint"
@@ -74,4 +75,6 @@ select = [
 # The queue runs unattended, so it reports skipped jobs on stderr rather than
 # failing silently.
 "src/slabprint/jobs.py" = ["T20"]
+# The bridge runs unattended under a supervisor; stderr is how it reports.
+"src/slabprint/telegram.py" = ["T20"]
 "tests/*" = ["ARG"]

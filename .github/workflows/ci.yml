@@ -21,7 +21,7 @@ jobs:
         run: uvx ruff@0.16.7 format --check .
 
       - name: pytest
-        run: uvx --with pytest --with pillow --with pyusb --with bleak pytest -q
+        run: uvx --with pytest --with pillow --with pyusb --with bleak --with pypdfium2 pytest -q
 
   nix:
     # Proves the flake builds and runs the suite in its sandbox.

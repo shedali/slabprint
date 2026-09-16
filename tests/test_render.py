@@ -5,7 +5,7 @@
 import io
 
 import pytest
-from PIL import Image
+from PIL import Image, ImageDraw
 
 from slabprint import core, render
 
@@ -199,3 +199,58 @@ def test_empty_stdin_is_a_clean_error(monkeypatch):
     monkeypatch.setattr(render.sys, "stdin", FakeStdin)
     with pytest.raises(ValueError, match="no image data"):
         render.load_image("-")
+
+
+def make_pdf(path, pages=2):
+    images = [Image.new("RGB", (620, 877), "white") for _ in range(pages)]
+    for number, image in enumerate(images, start=1):
+        ImageDraw.Draw(image).text((40, 40), f"page {number}", fill="black")
+    images[0].save(path, save_all=True, append_images=images[1:])
+    return path
+
+
+def test_a_pdf_is_detected_by_content(tmp_path):
+    assert render.is_pdf(str(make_pdf(tmp_path / "doc.pdf")))
+
+
+def test_a_png_is_not_mistaken_for_a_pdf(tmp_path):
+    source = tmp_path / "x.png"
+    Image.new("RGB", (10, 10), "white").save(source)
+    assert not render.is_pdf(str(source))
+
+
+def test_a_missing_file_is_not_a_pdf(tmp_path):
+    assert not render.is_pdf(str(tmp_path / "nope.pdf"))
+
+
+def test_loading_a_pdf_defaults_to_the_first_page_only(tmp_path):
+    pages = render.load_pdf(str(make_pdf(tmp_path / "doc.pdf", pages=3)))
+    assert len(pages) == 1
+    assert pages[0].width == render.WIDTH_PX
+
+
+def test_all_pages_can_be_requested(tmp_path):
+    assert len(render.load_pdf(str(make_pdf(tmp_path / "doc.pdf", pages=3)), pages="all")) == 3
+
+
+def test_a_page_range_can_be_requested(tmp_path):
+    assert len(render.load_pdf(str(make_pdf(tmp_path / "doc.pdf", pages=4)), pages="2-3")) == 2
+
+
+@pytest.mark.parametrize(
+    "spec, total, expected",
+    [
+        ("1", 5, [0]),
+        ("2-4", 5, [1, 2, 3]),
+        ("all", 3, [0, 1, 2]),
+        ("2-99", 3, [1, 2]),
+    ],
+)
+def test_page_specs_parse(spec, total, expected):
+    assert render.parse_pages(spec, total) == expected
+
+
+@pytest.mark.parametrize("spec", ["0", "3-1", "-1", "two"])
+def test_nonsense_page_specs_are_refused(spec):
+    with pytest.raises(ValueError):
+        render.parse_pages(spec, 5)

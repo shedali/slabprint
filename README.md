@@ -61,6 +61,8 @@ slabprint print --image photo.jpg --dither        # a picture
 pbpaste | slabprint print --size 30              # whatever is on the clipboard
 pngpaste - | slabprint print --image - --dither  # a clipboard IMAGE (macOS)
 slabprint print --self-test                       # the printer's own test page
+slabprint print --image invoice.pdf               # first page of a PDF
+slabprint print --image doc.pdf --pages all       # every page, one note each
 slabprint print --columns 2 --size 20 < list.txt  # long checklist, half the paper
 slabprint print --box "Back in 10 minutes"            # framed, like a card
 ```
@@ -111,6 +113,98 @@ calls `slabprint queue run`, so put that on a timer — every minute is plenty:
 ```
 * * * * * /ABSOLUTE/PATH/TO/slabprint queue run
 ```
+
+### PDFs
+
+```bash
+slabprint print --image doc.pdf              # the first page
+slabprint print --image doc.pdf --pages 2-3  # a range
+slabprint print --image doc.pdf --pages all  # everything
+```
+
+It prints the **first page only** unless told otherwise, because a long document
+would otherwise quietly become a great many sticky notes. Each page is a separate
+job, so the printer cuts between them and they arrive as separate notes.
+
+Needs `pypdfium2`, which the flake includes. With a pip install, ask for it:
+`pipx install 'slabprint[pdf]'`.
+
+### Printing from Telegram
+
+Print from your phone, from anywhere, with no port forwarding and nothing
+listening on your network: the bridge long-polls Telegram, so the connection is
+always outbound.
+
+**1. Make a bot.** Message [@BotFather](https://t.me/BotFather), send `/newbot`,
+follow the prompts, and keep the token it gives you. Give printing a bot of its
+own — Telegram delivers each update exactly once, so two programs polling the
+same bot steal messages from each other.
+
+**2. Find your chat id.** Send your new bot a message, then:
+
+```bash
+export SLABPRINT_TG_TOKEN=123456:your-token-here
+slabprint telegram --whoami
+```
+
+```
+72345388	direct	yourname
+```
+
+**3. Run it**, allowing only that chat:
+
+```bash
+export SLABPRINT_TG_ALLOW=72345388
+slabprint telegram
+```
+
+Now send the bot text, a photo or a PDF and it prints. `/status` reports whether
+the printer is ready.
+
+**The allowlist is mandatory and has no wildcard**, and the bridge refuses to
+start without one. A bot's username is public and anyone can message it, so an
+allowlist is the only thing standing between a stranger and your paper. Chats not
+on it are ignored silently, without even a refusal — a reply would confirm the
+bot is live.
+
+#### Groups
+
+Add the bot to a group and put the group's id (it is negative) in the allowlist:
+
+```bash
+export SLABPRINT_TG_ALLOW=72345388,-1001234567890
+```
+
+In a group the bridge acts **only** on an explicit `/print`:
+
+```
+/print bins out tonight          prints the text
+photo or PDF captioned /print    prints the attachment
+/status                          checks the printer
+anything else                    ignored
+```
+
+A group is a conversation, not an input queue — printing every message would put
+the whole chat on paper. This also means Telegram's default privacy mode, under
+which a bot in a group only sees commands addressed to it, needs no changing.
+
+Everyone in the group can print. The allowlist is per chat, not per person.
+
+#### Keeping the token out of a plist
+
+`SLABPRINT_TG_TOKEN_COMMAND` is run and its output used as the token, so it can
+live in a password manager rather than in a service file or your shell history:
+
+```bash
+export SLABPRINT_TG_TOKEN_COMMAND='op read op://vault/slabprint-bot/token'
+```
+
+#### Running it permanently
+
+Any supervisor will do; it is a long-running process that should always be up.
+On macOS, a LaunchAgent with `KeepAlive` set; on Linux, a systemd user unit with
+`Restart=always`. Point it at `slabprint telegram` and give it
+`SLABPRINT_TG_ALLOW` plus a way to get the token.
 
 ### Printing from elsewhere on the network
 
